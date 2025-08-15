@@ -1,0 +1,144 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patient — Check‑In</title>
+  <style>
+    :root { --bg:#f8fafc; --panel:#fff; --ink:#0f172a; --muted:#64748b; --border:#e5e7eb; }
+    *{ box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Segoe UI,Roboto,Helvetica,Arial }
+    body{ margin:0; background:var(--bg); color:var(--ink) }
+    .wrap{ max-width:760px; margin:0 auto; padding:16px }
+    .card{ background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.05) }
+    .grid{ display:grid; gap:12px } .grid2{ grid-template-columns:1fr } @media(min-width:640px){ .grid2{ grid-template-columns:1fr 1fr } }
+    label{ font-size:14px; font-weight:600; display:block; margin-bottom:6px }
+    input,select,textarea,button{ width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:#fff; font-size:16px }
+    textarea{ min-height:100px; resize:vertical }
+    .pill{ display:inline-flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:12px; padding:8px 10px }
+    .muted{ font-size:12px; color:var(--muted) } .btn{ background:#111827; color:#fff; border:none; cursor:pointer } .btn:disabled{ opacity:.5 }
+    .error{ color:#b91c1c; font-size:12px; display:none; margin-top:6px }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1 style="font-size:20px;margin:12px 0 16px">Clinic Check‑In</h1>
+  <div class="card">
+    <form id="form" class="grid">
+      <div class="grid grid2">
+        <div>
+          <label>Kennitala (10 digits)</label>
+          <input id="kt" inputmode="numeric" maxlength="10"/>
+          <div id="ktErr" class="error">Kennitala must be exactly 10 digits.</div>
+          <div class="muted">If you do not have a kennitala/ID, please check in at the reception desk.</div>
+        </div>
+        <div>
+          <label>Full name</label>
+          <input id="name" required/>
+        </div>
+      </div>
+      <div class="grid grid2">
+        <div>
+          <label>Mobile phone</label>
+          <input id="phone" inputmode="tel" required/>
+        </div>
+        <div>
+          <label>Is this an acute emergency? (A)</label>
+          <div>
+            <label class="pill"><input type="radio" name="acute" value="yes"> Yes</label>
+            <label class="pill"><input type="radio" name="acute" value="no" checked> No</label>
+          </div>
+          <div class="muted">Breathing trouble, chest pain, severe bleeding, fainting → Yes.</div>
+        </div>
+      </div>
+      <div>
+        <label>Main complaint (optional)</label>
+        <select id="complaint">
+          <option value="">Select…</option>
+          <option value="respiratory">Respiratory</option>
+          <option value="cardiac">Cardiac</option>
+          <option value="gi">Gastrointestinal</option>
+          <option value="ms">Musculoskeletal</option>
+          <option value="derm">Dermatology</option>
+          <option value="uro">Urology/Gyn</option>
+          <option value="mh">Mental health</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div id="rfBlock" style="display:none">
+        <label>Red flags (select any that apply)</label>
+        <div id="redflags" class="grid"></div>
+      </div>
+      <div>
+        <label>Anything else the doctor should know? (optional)</label>
+        <textarea id="details" maxlength="500"></textarea>
+      </div>
+      <label class="pill"><input id="consent" type="checkbox"> I consent to processing my data for triage and queueing.</label>
+      <button id="submit" class="btn" disabled>Get my ticket</button>
+    </form>
+  </div>
+</div>
+<script>
+  const API_BASE = '/.netlify/functions/';
+  const $ = (id)=>document.getElementById(id);
+  const api = (p,o)=> fetch(API_BASE+p,o);
+  const redFlagOptions = {
+    respiratory: ["Shortness of breath at rest","Bluish lips/face","High fever in infant <3 months"],
+    cardiac: ["Chest pain","Fainting/blackout","New irregular heartbeat"],
+    gi: ["Severe abdominal pain","Persistent vomiting","Blood in stool"],
+    ms: ["Open fracture","Severe limb deformity","Loss of sensation"],
+    derm: ["Rapidly spreading rash","Severe allergic reaction","Facial swelling"],
+    uro: ["Severe pelvic pain","Heavy bleeding","Pregnancy + severe pain"],
+    mh: ["Suicidal thoughts","Hallucinations/confusion","Not safe at home"],
+    other: ["Uncontrolled bleeding","Severe dehydration","Altered mental state"]
+  };
+  function ktValid(v){ return /^\d{10}$/.test(v); }
+  function rfRender(){
+    const wrap = $('#redflags'); wrap.innerHTML='';
+    const list = redFlagOptions[$('#complaint').value] || [];
+    $('#rfBlock').style.display = list.length ? 'block' : 'none';
+    list.forEach(rf=>{
+      const lab = document.createElement('label'); lab.className='pill';
+      const cb = document.createElement('input'); cb.type='checkbox'; cb.value=rf;
+      lab.appendChild(cb); lab.append(' '+rf);
+      wrap.appendChild(lab);
+    });
+  }
+  function updateSubmit(){
+    const kt=$('#kt').value.trim();
+    const ok = $('#consent').checked && ktValid(kt) && $('#name').value.trim() && $('#phone').value.trim();
+    $('#submit').disabled = !ok;
+  }
+  $('#kt').addEventListener('input', updateSubmit);
+  $('#kt').addEventListener('blur', ()=>{ const v=$('#kt').value.trim(); $('#ktErr').style.display = (v && !ktValid(v)) ? 'block' : 'none'; });
+  ['name','phone','complaint','details'].forEach(id=> $('#'+id).addEventListener('input', updateSubmit));
+  document.getElementById('consent').addEventListener('change', updateSubmit);
+  $('#complaint').addEventListener('change', rfRender);
+  updateSubmit();
+
+  function computeBand({ acute, redFlags, details }){
+    if (acute==='yes' || (redFlags && redFlags.length>0)) return 'A';
+    if ((details||'').trim().length>60) return 'B';
+    return 'C';
+  }
+
+  document.getElementById('form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const redFlags = Array.from(document.querySelectorAll('#redflags input[type=checkbox]:checked')).map(el=>el.value);
+    const body = {
+      kt: $('#kt').value.trim(),
+      name: $('#name').value.trim(),
+      phone: $('#phone').value.trim(),
+      complaint: $('#complaint').value,
+      redFlags,
+      details: $('#details')?.value?.trim() || '',
+      acute: document.querySelector('input[name=acute]:checked')?.value || 'no'
+    };
+    body.band = computeBand(body);
+    const res = await api('tickets-create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!res.ok){ alert('Server error'); return; }
+    const data = await res.json();
+    location.href = '../patient/ticket.html?id=' + encodeURIComponent(data.id);
+  });
+</script>
+</body>
+</html>
