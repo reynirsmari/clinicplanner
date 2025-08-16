@@ -1,9 +1,11 @@
 [build]
 publish = "."
+command = "npm install"
 
 [functions]
 directory = "netlify/functions"
 node_bundler = "esbuild"
+included_files = ["node_modules/@netlify/blobs/**", "node_modules/@netlify/runtime-utils/**"]
 
 [build.environment]
 NODE_VERSION = "20"
