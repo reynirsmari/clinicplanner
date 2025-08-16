@@ -1,7 +1,0 @@
-
-[build]
-  command = ""   # no build; we are uploading pre-baked static files
-  publish = "."  # serve from the root of the uploaded folder
-
-[functions]
-  directory = "netlify/functions"
