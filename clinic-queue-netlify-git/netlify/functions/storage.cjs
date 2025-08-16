@@ -1,4 +1,3 @@
-// netlify/functions/storage.cjs
 // Uses Netlify Blobs with EXPLICIT credentials from env vars.
 const STORE_NAME = 'tickets';
 const KEY = 'queue.json';
