@@ -1,6 +1,6 @@
 const { readAll, recalc, positionOf, json, bad } = require('./storage.cjs');
 
-exports.handler = async function (event) {
+exports.handler = async (event) => {
   const id = (event.queryStringParameters || {}).id;
   if (!id) return bad('Missing id');
   const all = await readAll();
