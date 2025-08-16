@@ -1,9 +1,11 @@
+// storage.cjs — CJS helpers with dynamic ESM import of Netlify Blobs
 const STORE_NAME = 'tickets';
 const KEY = 'queue.json';
 
 async function getStore(){
-  const mod = await import('@netlify/blobs/dist/main.js');
-  return mod.getStore(STORE_NAME);
+  // Import from the PACKAGE ROOT so it matches package "exports"
+  const blobs = await import('@netlify/blobs'); // <-- fixed
+  return blobs.getStore(STORE_NAME);
 }
 
 async function readAll(){
