@@ -1,16 +1,6 @@
-// Try to wire Netlify Blobs automatically when available, but don't fail if not.
-// Supports different @netlify/blobs versions and Lambda compat.
-async function connectIfPossible(event){
-  try {
-    const blobs = await import('@netlify/blobs');
-    if (typeof blobs.connectLambda === 'function') { blobs.connectLambda(event); }
-    else if (typeof blobs.connect === 'function') { blobs.connect(event); }
-  } catch {}
-}
 let { readAll, writeAll, recalc, json, bad } = require('./storage.cjs');
 
 exports.handler = async function (event) {
-  await connectIfPossible(event);
   if (event.httpMethod !== 'POST') return bad('POST only', 405);
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { return bad('Invalid JSON'); }
@@ -19,30 +9,30 @@ exports.handler = async function (event) {
 
   let all = await readAll();
 
-  if (action === 'clear_done') {
-    all = all.filter((t) => t.status !== 'done');
+  if (action === 'clear_done'){
+    all = all.filter(t => t.status !== 'done');
     recalc(all);
     await writeAll(all);
-    return json({ ok: true });
+    return json({ ok:true });
   }
 
-  const t = all.find((x) => x.id === id);
+  const t = all.find(x => x.id === id);
   if (!t) return bad('Not found', 404);
 
-  if (action === 'call') t.status = 'called';
-  else if (action === 'defer') t.createdAt += 10 * 60000;
-  else if (action === 'noshow') t.status = 'noshow';
-  else if (action === 'done') t.status = 'done';
-  else if (action === 'escalate') t.band = 'A';
-  else if (action === 'cancel') {
-    all = all.filter((x) => x.id !== id);
+  if (action==='call') t.status='called';
+  else if (action==='defer') t.createdAt += 10*60000;
+  else if (action==='noshow') t.status='noshow';
+  else if (action==='done') t.status='done';
+  else if (action==='escalate') t.band='A';
+  else if (action==='cancel'){
+    all = all.filter(x=>x.id!==id);
     await writeAll(all);
-    return json({ ok: true });
+    return json({ ok:true });
   } else {
     return bad('Unknown action');
   }
 
   recalc(all);
   await writeAll(all);
-  return json({ ok: true });
+  return json({ ok:true });
 };

@@ -1,21 +1,17 @@
-// storage.cjs — shared helpers for ticket storage using Netlify Blobs
-// - Auto works if a handler called connectIfPossible(event)
-// - Falls back to manual credentials via env vars if needed
+// storage.cjs — Netlify Blobs with MANUAL auth (no connectLambda)
+// Set env vars in Netlify: BLOBS_SITE_ID and BLOBS_TOKEN (fallbacks to NETLIFY_* if provided)
 
 const STORE_NAME = 'tickets';
 const KEY = 'queue.json';
 
 async function getStore() {
-  const blobs = await import('@netlify/blobs');
-  try {
-    // Preferred: environment already wired by connectIfPossible(event) in the handler
-    return blobs.getStore(STORE_NAME);
-  } catch (e) {
-    const siteID = process.env.NETLIFY_SITE_ID || process.env.BLOBS_SITE_ID || process.env.SITE_ID;
-    const token  = process.env.NETLIFY_API_TOKEN || process.env.BLOBS_TOKEN  || process.env.NETLIFY_TOKEN;
-    if (siteID && token) return blobs.getStore(STORE_NAME, { siteID, token });
-    throw e;
+  const { getStore } = await import('@netlify/blobs');
+  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token  = process.env.BLOBS_TOKEN   || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_TOKEN;
+  if (!siteID || !token) {
+    throw new Error('Missing BLOBS_SITE_ID and/or BLOBS_TOKEN environment variables.');
   }
+  return getStore(STORE_NAME, { siteID, token });
 }
 
 async function readAll() {
@@ -67,17 +63,6 @@ function json(res, status = 200) {
   };
 }
 
-function bad(msg, status = 400) {
-  return json({ error: msg }, status);
-}
+function bad(msg, status = 400) { return json({ error: msg }, status); }
 
-module.exports = {
-  readAll,
-  writeAll,
-  sortTickets,
-  recalc,
-  positionOf,
-  computeBand,
-  json,
-  bad,
-};
+module.exports = { readAll, writeAll, sortTickets, recalc, positionOf, computeBand, json, bad };
