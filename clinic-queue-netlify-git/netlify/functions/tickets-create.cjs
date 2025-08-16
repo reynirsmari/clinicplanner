@@ -8,10 +8,11 @@ exports.handler = async (event) => {
   const now = Date.now();
   const band = computeBand(body);
   const id = `${band}-${Math.random().toString(36).slice(2,7)}`;
+
   const ticket = {
     id, band,
     complaint: body.complaint || '',
-    redFlags: Array.isArray(body.redFlags)? body.redFlags : [],
+    redFlags: Array.isArray(body.redFlags) ? body.redFlags : [],
     name: body.name || '', kt: body.kt || '', phone: body.phone || '',
     details: body.details || '', acute: body.acute || 'no',
     createdAt: now, status: 'waiting', estWait: 0
