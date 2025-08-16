@@ -1,79 +1,63 @@
-// Shared storage helpers (manual-auth for Netlify Blobs)
-const STORE_NAME = 'tickets';
-const KEY = 'queue.json';
+// netlify/functions/storage.cjs  (CommonJS, safe on Netlify)
+// Purpose: create a Netlify Blobs client with explicit credentials so we
+// never depend on auto-injection.
 
-async function getStore() {
-  const { getStore } = await import('@netlify/blobs');
+const JSON_HEADERS = {
+  'content-type': 'application/json; charset=utf-8',
+  'cache-control': 'no-store',
+};
+
+function pickEnv() {
+  // Accept any of these names to avoid scope/name mismatches in Netlify UI
   const siteID =
     process.env.BLOBS_SITE_ID ||
+    process.env.SITE_ID ||
     process.env.NETLIFY_SITE_ID ||
-    process.env.SITE_ID;
+    '';
+
   const token =
     process.env.BLOBS_TOKEN ||
     process.env.NETLIFY_API_TOKEN ||
-    process.env.NETLIFY_TOKEN;
+    process.env.NETLIFY_TOKEN ||
+    '';
+
+  return { siteID, token };
+}
+
+async function getClientAndStore(name = 'tickets') {
+  const { siteID, token } = pickEnv();
   if (!siteID || !token) {
-    throw new Error('Missing BLOBS_SITE_ID and/or BLOBS_TOKEN environment variables.');
+    // Make the failure obvious and debuggable from the function response
+    const missing = [];
+    if (!siteID) missing.push('siteID');
+    if (!token) missing.push('token');
+    const msg = `Blobs manual auth missing: ${missing.join(', ')}. ` +
+      `Expected BLOBS_SITE_ID/SITE_ID/NETLIFY_SITE_ID and ` +
+      `BLOBS_TOKEN/NETLIFY_API_TOKEN/NETLIFY_TOKEN to be set.`;
+    const err = new Error(msg);
+    err._http = {
+      statusCode: 500,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ error: msg, seen: pickEnv() }),
+    };
+    throw err;
   }
-  return getStore(STORE_NAME, { siteID, token });
+
+  // Dynamic import because @netlify/blobs is ESM
+  const { createClient } = await import('@netlify/blobs');
+  const client = createClient({ siteID, token }); // <— critical line
+  return client.getStore(name);
 }
 
-async function readAll() {
-  const store = await getStore();
-  const data = await store.get(KEY, { type: 'json' });
-  return Array.isArray(data) ? data : [];
-}
-
-async function writeAll(arr) {
-  const store = await getStore();
-  await store.set(KEY, JSON.stringify(arr), { contentType: 'application/json' });
-}
-
-function sortTickets(arr) {
-  const rank = (b) => (b === 'A' ? 0 : b === 'B' ? 1 : 2);
-  return [...arr].sort((a, b) => {
-    const r = rank(a.band) - rank(b.band);
-    if (r !== 0) return r;
-    return (a.createdAt || 0) - (b.createdAt || 0);
-  });
-}
-
-function recalc(all) {
-  const waiting = sortTickets(all.filter((t) => t.status === 'waiting'));
-  waiting.forEach((t, idx) => {
-    const minsPer = t.band === 'A' ? 3 : t.band === 'B' ? 6 : 8;
-    t.estWait = minsPer * idx;
-  });
-}
-
-function positionOf(all, id) {
-  const waiting = sortTickets(all.filter((t) => t.status === 'waiting'));
-  const idx = waiting.findIndex((t) => t.id === id);
-  return idx >= 0 ? idx : 0;
-}
-
-function computeBand(body) {
-  if (body.acute === 'yes') return 'A';
-  if (Array.isArray(body.redFlags) && body.redFlags.length > 0) return 'A';
-  if ((body.details || '').trim().length > 60) return 'B';
-  return 'C';
-}
-
-function json(res, status = 200) {
-  return {
-    statusCode: status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'access-control-allow-origin': '*',
-    },
-    body: JSON.stringify(res),
-  };
-}
-
-function bad(msg, status = 400) {
-  return json({ error: msg }, status);
-}
+// Convenience helpers used by list/create/etc.
+// If your other functions already import getStore2/getStore, these names cover both.
+async function getStore2() { return getClientAndStore('tickets'); }
+async function getStore()  { return getClientAndStore('tickets'); }
 
 module.exports = {
-  readAll, writeAll, sortTickets, recalc, positionOf, computeBand, json, bad
+  JSON_HEADERS,
+  pickEnv,
+  getClientAndStore,
+  getStore2,
+  getStore,
 };
