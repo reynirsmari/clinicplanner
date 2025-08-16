@@ -1,179 +1,133 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Patient — Check‑In (Offline)</title>
-  <style>
-    :root { --bg:#f8fafc; --panel:#fff; --ink:#0f172a; --muted:#64748b; --border:#e5e7eb; }
-    *{ box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Segoe UI,Roboto,Helvetica,Arial }
-    body{ margin:0; background:var(--bg); color:var(--ink) }
-    .wrap{ max-width:760px; margin:0 auto; padding:16px }
-    .card{ background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.05) }
-    .grid{ display:grid; gap:12px } .grid2{ grid-template-columns:1fr } @media(min-width:640px){ .grid2{ grid-template-columns:1fr 1fr } }
-    label{ font-size:14px; font-weight:600; display:block; margin-bottom:6px }
-    input,select,textarea,button{ width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:#fff; font-size:16px }
-    textarea{ min-height:100px; resize:vertical }
-    .pill{ display:inline-flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:12px; padding:8px 10px }
-    .muted{ font-size:12px; color:var(--muted) } .btn{ background:#111827; color:#fff; border:none; cursor:pointer } .btn:disabled{ opacity:.5 }
-    .error{ color:#b91c1c; font-size:12px; display:none; margin-top:6px }
-
-/* --- Red flags layout --- */
-#redflags{ display:grid; gap:10px; grid-template-columns:1fr; }
-@media(min-width:640px){ #redflags{ grid-template-columns:1fr 1fr; } }
-.rf-card{ display:flex; align-items:flex-start; gap:12px; width:100%;
-  border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:#fff; cursor:pointer; }
-.rf-card:hover{ box-shadow:0 4px 12px rgba(0,0,0,.06); }
-.rf-card input{ flex:0 0 auto; width:18px; height:18px; margin-top:3px; }
-.rf-text{ font-weight:600; line-height:1.25; }
-
-  </style>
-</head>
-<body>
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinic Check‑In</title>
+<style>
+:root{--bg:#f6f7fb;--panel:#fff;--ink:#0f172a;--muted:#64748b;--border:rgba(15,23,42,.12);--ring:rgba(15,23,42,.06);}
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Segoe UI,Roboto,Helvetica,Arial}
+html,body{height:100%} body{margin:0;background:var(--bg);color:var(--ink)}
+.wrap{max-width:960px;margin:0 auto;padding:24px}
+h1{margin:0 0 14px;font-size:clamp(20px,3.5vw,28px)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:18px;box-shadow:0 20px 40px rgba(2,6,23,.06)}
+.row{display:grid;grid-template-columns:1fr;gap:12px}@media(min-width:720px){.row{grid-template-columns:1fr 1fr}}
+label.cap{font-size:14px;font-weight:700}
+input,select,textarea{width:100%;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:#f8fafc}
+.kpi{display:grid;gap:12px;grid-template-columns:1fr}
+.error{color:#b91c1c;font-size:12px;display:none;margin-top:6px}
+/* Red flags cards */
+#redflags{display:grid;gap:10px;grid-template-columns:1fr}@media(min-width:640px){#redflags{grid-template-columns:1fr 1fr}}
+.rf-card{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer}
+.rf-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.06)} .rf-card input{width:18px;height:18px;margin-top:3px} .rf-text{font-weight:600;line-height:1.25}
+.pill{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff}
+.btn{width:100%;padding:14px;border:0;border-radius:14px;background:#111827;color:#fff;font-weight:700;cursor:pointer}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}
+</style></head><body>
 <div class="wrap">
-  <h1 style="font-size:20px;margin:12px 0 16px">Clinic Check‑In</h1>
-  <div class="card">
-    <form id="form" class="grid">
-      <div class="grid grid2">
-        <div>
-          <label>Kennitala (10 digits)</label>
-          <input id="kt" inputmode="numeric" maxlength="10"/>
-          <div id="ktErr" class="error">Kennitala must be exactly 10 digits.</div>
-          <div class="muted">If you do not have a kennitala/ID, please check in at the reception desk.</div>
-        </div>
-        <div>
-          <label>Full name</label>
-          <input id="name" required/>
-        </div>
-      </div>
-      <div class="grid grid2">
-        <div>
-          <label>Mobile phone</label>
-          <input id="phone" inputmode="tel" required/>
-        </div>
-        <div>
-          <label>Is this an acute emergency? (A)</label>
-          <div>
-            <label class="pill"><input type="radio" name="acute" value="yes"> Yes</label>
-            <label class="pill"><input type="radio" name="acute" value="no" checked> No</label>
-          </div>
-          <div class="muted">Breathing trouble, chest pain, severe bleeding, fainting → Yes.</div>
-        </div>
-      </div>
+  <h1>Clinic Check‑In</h1>
+  <form id="form" class="card">
+    <div class="row">
+      <div><label class="cap">Kennitala (10 digits)</label><input id="kt" inputmode="numeric" maxlength="10" placeholder="Kennitala"><div id="ktErr" class="error">Kennitala must be 10 digits.</div><div class="hint">If you do not have a kennitala/ID, please check in at the reception desk.</div></div>
+      <div><label class="cap">Full name</label><input id="name" placeholder="Your full name"></div>
+    </div>
+    <div class="row">
+      <div><label class="cap">Mobile phone</label><input id="phone" inputmode="numeric" placeholder="Phone number"></div>
       <div>
-        <label>Main complaint (optional)</label>
-        <select id="complaint">
-          <option value="">Select…</option>
-          <option value="respiratory">Respiratory</option>
-          <option value="cardiac">Cardiac</option>
-          <option value="gi">Gastrointestinal</option>
-          <option value="ms">Musculoskeletal</option>
-          <option value="derm">Dermatology</option>
-          <option value="uro">Urology/Gyn</option>
-          <option value="mh">Mental health</option>
-          <option value="other">Other</option>
-        </select>
+        <label class="cap">Is this an acute emergency? (A)</label>
+        <div class="pill"><label><input type="radio" name="acute" value="yes"> Yes</label><label style="margin-left:14px"><input type="radio" name="acute" value="no" checked> No</label></div>
+        <div class="hint">Breathing trouble, chest pain, severe bleeding, fainting → Yes.</div>
       </div>
-      <div id="rfBlock" style="display:none">
-        <label>Red flags (select any that apply)</label>
-        <div id="redflags" class="grid"></div>
-      </div>
-      <div>
-        <label>Anything else the doctor should know? (optional)</label>
-        <textarea id="details" maxlength="500"></textarea>
-      </div>
-      <label class="pill"><input id="consent" type="checkbox"> I consent to processing my data for triage and queueing.</label>
-      <button id="submit" class="btn" disabled>Get my ticket</button>
-      <div id="whyDisabled" class="muted" style="margin-top:6px;"></div>
-    </form>
-  </div>
-</div>
+    </div>
+    <div>
+      <label class="cap">Main complaint (optional)</label>
+      <select id="complaint">
+        <option value="">Select...</option>
+        <option>Respiratory</option><option>Cardiac</option><option>Gastrointestinal</option><option>Musculoskeletal</option><option>Dermatologic</option><option>Urologic</option><option>Mental health</option><option>Other</option>
+      </select>
+    </div>
 
+    <div id="rfBlock" style="display:none">
+      <label class="cap" style="margin-top:6px">Red flags (select any that apply)</label>
+      <div id="redflags"></div>
+    </div>
+
+    <div><label class="cap">Anything else the doctor should know? (optional)</label><textarea id="details" rows="5" placeholder="Describe your symptoms, when they started, medications, etc."></textarea></div>
+
+    <div class="pill"><input type="checkbox" id="consent"><span>I consent to processing my data for triage and queueing.</span></div>
+    <button class="btn" id="submit" disabled>Get my ticket</button>
+    <div id="why" class="hint"></div>
+  </form>
+</div>
 <script src="../shared/api.js"></script>
 <script>
-(function(){
-  function $(id){ return document.getElementById(id); }
-  function ktValid(v){ return /^\d{10}$/.test(v); }
+const $ = (sel)=>document.querySelector(sel);
+const rfMap = {
+  Respiratory: ["Shortness of breath at rest","Bluish lips/face","High fever in infant <3 months"],
+  Cardiac: ["Chest pain","Fainting/blackout","New irregular heartbeat"],
+  Gastrointestinal: ["Severe abdominal pain","Persistent vomiting","Blood in stool"],
+  Musculoskeletal: ["Open fracture","Severe limb deformity","Loss of sensation"],
+  Dermatologic: ["Rapidly spreading rash","Severe allergic reaction","Facial swelling"],
+  Urologic: ["Severe pelvic pain","Heavy bleeding","Pregnancy + severe pain"],
+  "Mental health": ["Suicidal thoughts","Hallucinations/confusion","Not safe at home"],
+  Other: ["Uncontrolled bleeding","Severe dehydration","Altered mental state"]
+};
 
-  function updateSubmit(){
-    var ktEl = $('kt'), nameEl=$('name'), phoneEl=$('phone'), consentEl=$('consent');
-    if (!ktEl || !nameEl || !phoneEl || !consentEl) return;
-    var ok = consentEl.checked && ktValid(ktEl.value.trim()) && nameEl.value.trim() && phoneEl.value.trim();
-    var btn = $('submit'); if (btn) btn.disabled = !ok;
-    var why = $('whyDisabled'); if (!why) return;
-    var missing = [];
-    if (!ktValid(ktEl.value.trim())) missing.push('kennitala (10 digits)');
-    if (!nameEl.value.trim()) missing.push('name');
-    if (!phoneEl.value.trim()) missing.push('phone');
-    if (!consentEl.checked) missing.push('consent');
-    why.textContent = missing.length ? ('Please complete: ' + missing.join(', ') + '.') : '';
+function ktValid(v){ return /^\d{10}$/.test(v); }
+
+function renderRF(){
+  const c = $('#complaint').value;
+  const list = rfMap[c] || [];
+  const box = $('#rfBlock'); box.style.display = list.length ? 'block':'none';
+  const wrap = document.getElementById('redflags'); wrap.innerHTML='';
+  list.forEach(txt => {
+    const lab = document.createElement('label'); lab.className='rf-card';
+    const cb = document.createElement('input'); cb.type='checkbox'; cb.value=txt;
+    const span = document.createElement('span'); span.className='rf-text'; span.textContent = txt;
+    lab.appendChild(cb); lab.appendChild(span); wrap.appendChild(lab);
+  });
+  updateSubmit();
+}
+
+function selectedRedFlags(){
+  return Array.from(document.querySelectorAll('#redflags input:checked')).map(i=>i.value);
+}
+
+function updateSubmit(){
+  const ok = $('#consent').checked && ktValid($('#kt').value) && $('#name').value.trim() && $('#phone').value.trim();
+  $('#submit').disabled = !ok;
+  const why = [];
+  if (!$('#consent').checked) why.push('consent');
+  if (!ktValid($('#kt').value)) why.push('valid kennitala');
+  if (!$('#name').value.trim()) why.push('name');
+  if (!$('#phone').value.trim()) why.push('phone');
+  $('#why').textContent = ok ? '' : 'Please complete: ' + why.join(', ') + '.';
+  document.getElementById('ktErr').style.display = $('#kt').value && !ktValid($('#kt').value) ? 'block':'none';
+}
+
+['#kt','#name','#phone','#consent','#complaint'].forEach(s=>{
+  const el = $(s); if (!el) return;
+  el.addEventListener('input', s==='#complaint'?renderRF:updateSubmit);
+  el.addEventListener('change', s==='#complaint'?renderRF:updateSubmit);
+});
+
+document.getElementById('form').addEventListener('submit', async (e)=>{
+  e.preventDefault(); updateSubmit(); if ($('#submit').disabled) return;
+  const body = {
+    kt: $('#kt').value.trim(),
+    name: $('#name').value.trim(),
+    phone: $('#phone').value.trim(),
+    acute: document.querySelector('input[name="acute"]:checked')?.value || 'no',
+    complaint: $('#complaint').value,
+    details: $('#details').value,
+    redFlags: selectedRedFlags()
+  };
+  try{
+    const t = await window.API.createTicket(body);
+    location.href = './ticket.html?id=' + encodeURIComponent(t.id);
+  }catch(err){
+    alert('Create failed: ' + (err?.message||err));
+    console.error(err);
   }
+});
 
-  function rfRender(){
-    var listMap = {
-      respiratory: ["Shortness of breath at rest","Bluish lips/face","High fever in infant <3 months"],
-      cardiac: ["Chest pain","Fainting/blackout","New irregular heartbeat"],
-      gi: ["Severe abdominal pain","Persistent vomiting","Blood in stool"],
-      ms: ["Open fracture","Severe limb deformity","Loss of sensation"],
-      derm: ["Rapidly spreading rash","Severe allergic reaction","Facial swelling"],
-      uro: ["Severe pelvic pain","Heavy bleeding","Pregnancy + severe pain"],
-      mh: ["Suicidal thoughts","Hallucinations/confusion","Not safe at home"],
-      other: ["Uncontrolled bleeding","Severe dehydration","Altered mental state"]
-    };
-    var rfWrap = $('redflags'), rfBlock = $('rfBlock'), comp = $('complaint');
-    if (!rfWrap || !rfBlock || !comp) return;
-    rfWrap.innerHTML='';
-    var list = listMap[comp.value] || [];
-    rfBlock.style.display = list.length ? 'block' : 'none';
-    list.forEach(function(rf){
-      var lab = document.createElement('label'); lab.className='rf-card';
-      var cb = document.createElement('input'); cb.type='checkbox'; cb.value=rf;
-      var span = document.createElement('span'); span.className='rf-text'; span.textContent = rf;
-      lab.appendChild(cb); lab.appendChild(span);
-      rfWrap.appendChild(lab);
-    });
-  }
-
-  function computeBand(o){
-    if (o.acute==='yes' || (o.redFlags && o.redFlags.length>0)) return 'A';
-    if ((o.details||'').trim().length>60) return 'B';
-    return 'C';
-  }
-
-  function safeOn(el, evt, fn){ if (el && el.addEventListener) el.addEventListener(evt, fn); }
-
-  function init(){
-    safeOn($('kt'),'input',updateSubmit);
-    safeOn($('kt'),'blur',function(){
-      var el=$('kt'), err=$('ktErr'); if (!el || !err) return;
-      var v=el.value.trim(); err.style.display=(v && !/^\d{10}$/.test(v))?'block':'none';
-    });
-    ['name','phone','complaint','details'].forEach(function(id){ safeOn($(id),'input',updateSubmit); });
-    safeOn($('consent'),'change',updateSubmit);
-    safeOn($('complaint'),'change',rfRender);
-    updateSubmit();
-
-    var form = $('form');
-    safeOn(form,'submit',async function(e){
-      e.preventDefault();
-      var redFlags = Array.prototype.slice.call(document.querySelectorAll('#redflags input[type=checkbox]:checked')).map(function(el){return el.value;});
-      var acuteEl = document.querySelector('input[name=acute]:checked');
-      var body = {
-        kt: ($('kt')||{value:''}).value.trim(),
-        name: ($('name')||{value:''}).value.trim(),
-        phone: ($('phone')||{value:''}).value.trim(),
-        complaint: ($('complaint')||{value:''}).value,
-        redFlags: redFlags,
-        details: ($('details')||{value:''}).value.trim(),
-        acute: (acuteEl && acuteEl.value) || 'no'
-      };
-      body.band = computeBand(body);
-      var data = await window.API.createTicket(body);
-      location.href = './ticket.html?id=' + encodeURIComponent(data.id);
-    });
-  }
-
-  if (document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
-})();
-</script>
-</body>
-</html>
+renderRF(); updateSubmit();
+</script></body></html>

@@ -1,4 +1,3 @@
-/** Shared storage helpers using Netlify Blobs (ESM entrypoint) */
 import { getStore } from '@netlify/blobs/dist/main.js';
 
 const STORE_NAME = 'tickets';

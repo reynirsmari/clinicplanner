@@ -1,57 +1,33 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Clinic Dashboard · Clinic Queue</title>
-  <style>
-    :root{
-      --bg:#f6f7fb; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --border:rgba(15,23,42,.08);
-      --ring:rgba(15,23,42,.06); --shadow:0 24px 48px rgba(2,6,23,.06);
-      --a:#7f1d1d; --b:#78350f; --c:#064e3b;
-      --btn:#0f172a; --btnTxt:#fff; --max:1100px;
-    }
-    *{ box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Segoe UI,Roboto,Helvetica,Arial }
-    html,body{ height:100% } body{ margin:0; background:var(--bg); color:var(--ink) }
-    .wrap{ max-width:var(--max); margin:0 auto; padding:24px 24px }
-    .topbar{ position:sticky; top:0; background:linear-gradient(#f9fafb, transparent);
-      backdrop-filter:saturate(180%) blur(8px); z-index:10; border-bottom:1px solid rgba(15,23,42,.06) }
-    .topbar .inner{ max-width:var(--max); margin:0 auto; padding:12px 24px 8px }
-    .toprow{ display:flex; gap:12px; align-items:center; justify-content:space-between; }
-    .h1{ margin:0; font-size:clamp(18px,3.5vw,24px); letter-spacing:-.02em }
-    .btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid var(--border);
-      background:#fff; color:var(--ink); cursor:pointer; box-shadow:0 8px 20px rgba(2,6,23,.05) }
-    .btn.primary{ background:var(--btn); color:var(--btnTxt); border-color:rgba(255,255,255,.08) }
-    .btn:active{ transform:translateY(1px) }
-    .grid{ display:grid; gap:10px; grid-template-columns:1fr 1fr; }
-    @media(min-width:620px){ .grid{ grid-template-columns:repeat(6,1fr); } }
-    .kcard{ background:linear-gradient(180deg,#fff,#fbfbfd); border:1px solid var(--border); border-radius:16px; padding:12px 14px; box-shadow: inset 0 1px 0 var(--ring) }
-    .cap{ color:var(--muted); font-size:12px } .val{ font-size:18px; font-weight:800 }
-    .list{ display:grid; gap:12px; margin-top:12px }
-    .row{ display:grid; gap:10px; grid-template-columns:1fr; background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:12px 12px;
-      box-shadow:0 10px 24px rgba(2,6,23,.05) }
-    @media(min-width:980px){ .row{ grid-template-columns:220px 1fr auto; align-items:center; } }
-    .badge{ display:inline-flex; align-items:center; gap:8px; font-weight:700; }
-    .dot{ width:10px; height:10px; border-radius:999px }
-    .bandA .dot{ background:#ef4444 } .bandB .dot{ background:#f59e0b } .bandC .dot{ background:#10b981 }
-    .id{ font-weight:800; letter-spacing:.02em } .small{ font-size:12px; color:var(--muted) }
-    .actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end }
-    @media(min-width:980px){ .actions{ flex-wrap:nowrap; white-space:nowrap } }
-    .pill{ padding:8px 12px; border-radius:12px; border:1px solid var(--border); background:#fff; cursor:pointer; white-space:nowrap }
-    .pill.warn{ background:#0f172a; color:#fff; border-color:rgba(255,255,255,.08) }
-    .pill.danger{ background:#7f1d1d; color:#fff; border-color:#7f1d1d }
-    .pill.green{ background:#065f46; color:#ecfdf5; border-color:#065f46 }
-    .pill.orange{ background:#78350f; color:#fff3; border-color:#78350f }
-    .muted{ color:var(--muted) }
-    /* Mobile actions full-width */
-    @media(max-width:819px){
-      .actions{ justify-content:stretch }
-      .actions .pill{ flex:1 1 calc(50% - 8px) }
-    }
-  </style>
-</head>
-<body>
-  <div class="topbar">
-    <div class="inner"><div class="toprow">
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinic Dashboard · Clinic Queue</title>
+<style>
+:root{--bg:#f6f7fb; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --border:rgba(15,23,42,.08); --ring:rgba(15,23,42,.06); --shadow:0 24px 48px rgba(2,6,23,.06);
+--a:#7f1d1d; --b:#78350f; --c:#064e3b; --btn:#0f172a; --btnTxt:#fff; --max:1100px;}
+*{ box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Segoe UI,Roboto,Helvetica,Arial }
+html,body{ height:100% } body{ margin:0; background:var(--bg); color:var(--ink) }
+.topbar{ position:sticky; top:0; background:linear-gradient(#f9fafb, transparent); backdrop-filter:saturate(180%) blur(8px); z-index:10; border-bottom:1px solid rgba(15,23,42,.06) }
+.topbar .inner{ max-width:var(--max); margin:0 auto; padding:12px 24px 8px }
+.toprow{ display:flex; gap:12px; align-items:center; justify-content:space-between; }
+.h1{ margin:0; font-size:clamp(18px,3.5vw,24px); letter-spacing:-.02em }
+.btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#fff; color:var(--ink); cursor:pointer; box-shadow:0 8px 20px rgba(2,6,23,.05) }
+.wrap{ max-width:var(--max); margin:0 auto; padding:24px 24px }
+.grid{ display:grid; gap:10px; grid-template-columns:1fr 1fr } @media(min-width:620px){ .grid{ grid-template-columns:repeat(6,1fr) } }
+.kcard{ background:linear-gradient(180deg,#fff,#fbfbfd); border:1px solid var(--border); border-radius:16px; padding:12px 14px; box-shadow: inset 0 1px 0 var(--ring) }
+.cap{ color:var(--muted); font-size:12px } .val{ font-size:18px; font-weight:800 }
+.list{ display:grid; gap:12px; margin-top:12px }
+.row{ display:grid; gap:10px; grid-template-columns:1fr; background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:12px 12px; box-shadow:0 10px 24px rgba(2,6,23,.05) }
+@media(min-width:980px){ .row{ grid-template-columns:220px 1fr auto; align-items:center } }
+.badge{ display:inline-flex; align-items:center; gap:8px; font-weight:700 } .dot{ width:10px; height:10px; border-radius:999px }
+.bandA .dot{ background:#ef4444 } .bandB .dot{ background:#f59e0b } .bandC .dot{ background:#10b981 }
+.id{ font-weight:800; letter-spacing:.02em } .small{ font-size:12px; color:var(--muted) }
+.actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end } @media(min-width:980px){ .actions{ flex-wrap:nowrap; white-space:nowrap } }
+.pill{ padding:8px 12px; border-radius:12px; border:1px solid var(--border); background:#fff; cursor:pointer; white-space:nowrap }
+.pill.danger{ background:#7f1d1d; color:#fff; border-color:#7f1d1d } .pill.green{ background:#065f46; color:#ecfdf5; border-color:#065f46 } .pill.orange{ background:#78350f; color:#fff3; border-color:#78350f }
+.smallnote{ color:var(--muted); font-size:12px }
+</style></head><body>
+  <div class="topbar"><div class="inner">
+    <div class="toprow">
       <h1 class="h1">Clinic Dashboard</h1>
       <div class="right">
         <button id="addDemo" class="btn">+ Add demo</button>
@@ -67,12 +43,11 @@
       <div class="kcard"><div class="cap">C</div><div class="val" id="k_c">0</div></div>
       <div class="kcard"><div class="cap">Avg ETA</div><div class="val" id="k_eta">0m</div></div>
     </div>
-  </div>
-  </div>
+  </div></div>
 
   <div class="wrap">
     <div id="list" class="list"></div>
-    <p class="small muted">Ordering: A → B → C, then oldest first. “Defer” adds 10 minutes to check‑in time.</p>
+    <p class="smallnote">Ordering: A → B → C, then oldest first. “Defer” adds 10 minutes to check‑in time.</p>
   </div>
 
 <script src="../shared/api.js"></script>
@@ -128,7 +103,7 @@
   function onListClick(e){
     const btn = e.target.closest('button'); if (!btn) return;
     const id = btn.getAttribute('data-id'); const action = btn.getAttribute('data-act');
-    window.API.action({id,action}).then(render);
+    window.API.action(id,action).then(render);
   }
 
   function init(){
@@ -138,14 +113,10 @@
       await window.API.createTicket({band,name:'Demo',kt:'0000000000',complaint:'demo',redFlags:[]}); render();
     });
     $('refresh').addEventListener('click', render);
-    $('clearDone').addEventListener('click', async ()=>{ await window.API.action({action:'clear_done'}); render(); });
-    // broadcast removed for server version; polling remains.
+    $('clearDone').addEventListener('click', async ()=>{ await window.API.action('', 'clear_done'); render(); });
     render(); setInterval(render, 6000);
   }
-
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
-</script>
-</body>
-</html>
+</script></body></html>

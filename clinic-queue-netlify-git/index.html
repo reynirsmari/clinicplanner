@@ -1,6 +1,4 @@
-<!doctype html>
-<html lang="en">
-<head>
+<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Clinic Queue</title>
 <style>
@@ -14,16 +12,12 @@ h1{margin:0 0 14px 0;font-size:24px}
 a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.06)}
 .cap{color:var(--muted);font-size:12px}.big{font-size:20px;font-weight:700;margin-top:8px}
 .notice{margin-top:12px;font-size:12px;color:var(--muted)}
-</style>
-</head>
-<body>
+</style></head><body>
 <div class="wrap">
   <h1>Clinic Queue</h1>
   <div class="grid">
     <a class="card" href="./patient/index.html"><div class="cap">Public</div><div class="big">Patient check‑in</div></a>
     <a class="card" href="./clinic/index.html"><div class="cap">Staff</div><div class="big">Clinic dashboard</div></a>
   </div>
-  <p class="notice">Deployed as a static site with serverless functions. For shared queues, enable <strong>Netlify Blobs</strong> in Site settings.</p>
-</div>
-</body>
-</html>
+  <p class="notice">Serverless API: <code>/.netlify/functions/health</code> should return JSON.</p>
+</div></body></html>
