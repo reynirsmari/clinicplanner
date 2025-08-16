@@ -2,7 +2,7 @@
   "name": "clinic-queue-netlify",
   "private": true,
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "dependencies": {
     "@netlify/blobs": "^6.5.0"
   }
