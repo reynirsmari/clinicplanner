@@ -1,8 +1,0 @@
-{
-  "name": "clinic-queue-functions",
-  "private": true,
-  "version": "1.0.1",
-  "dependencies": {
-    "@netlify/blobs": "^6.5.0"
-  }
-}
