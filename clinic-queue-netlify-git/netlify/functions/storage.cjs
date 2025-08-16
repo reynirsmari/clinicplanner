@@ -1,6 +1,5 @@
-// storage.cjs — Netlify Blobs with MANUAL auth (no connectLambda)
-// Set env vars in Netlify: BLOBS_SITE_ID and BLOBS_TOKEN (fallbacks to NETLIFY_* if provided)
-
+// netlify/functions/storage.cjs
+// Uses Netlify Blobs with EXPLICIT credentials from env vars.
 const STORE_NAME = 'tickets';
 const KEY = 'queue.json';
 
@@ -62,7 +61,6 @@ function json(res, status = 200) {
     body: JSON.stringify(res),
   };
 }
-
 function bad(msg, status = 400) { return json({ error: msg }, status); }
 
 module.exports = { readAll, writeAll, sortTickets, recalc, positionOf, computeBand, json, bad };
