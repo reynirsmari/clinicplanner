@@ -1,6 +1,6 @@
 const { readAll, writeAll, computeBand, json, bad, recalc, positionOf } = require('./storage.cjs');
 
-exports.handler = async function (event) {
+exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return bad('POST only', 405);
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { return bad('Invalid JSON'); }
