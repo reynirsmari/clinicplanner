@@ -1,5 +1,5 @@
-/** Shared storage helpers using Netlify Blobs */
-import { getStore } from '@netlify/blobs';
+/** Shared storage helpers using Netlify Blobs (ESM entrypoint) */
+import { getStore } from '@netlify/blobs/dist/main.js';
 
 const STORE_NAME = 'tickets';
 const KEY = 'queue.json';
