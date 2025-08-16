@@ -1,5 +1,5 @@
 // storage.cjs — shared helpers for ticket storage using Netlify Blobs
-// - Works in Lambda compatibility mode via connectLambda(event) in each handler
+// - Auto works if a handler called connectIfPossible(event)
 // - Falls back to manual credentials via env vars if needed
 
 const STORE_NAME = 'tickets';
@@ -8,7 +8,7 @@ const KEY = 'queue.json';
 async function getStore() {
   const blobs = await import('@netlify/blobs');
   try {
-    // Preferred: environment already wired by connectLambda(event) in the handler
+    // Preferred: environment already wired by connectIfPossible(event) in the handler
     return blobs.getStore(STORE_NAME);
   } catch (e) {
     const siteID = process.env.NETLIFY_SITE_ID || process.env.BLOBS_SITE_ID || process.env.SITE_ID;
