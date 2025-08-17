@@ -1,57 +1,41 @@
-// netlify/functions/tickets-create.mjs
-// Creates a ticket and saves it via the portable storage helper.
-
-function genId() {
-  return (
-    Math.random().toString(36).slice(2, 6) +
-    Date.now().toString(36).slice(-4)
-  );
-}
+// netlify/functions/tickets-get.mjs
+// Reads a single ticket by id from the same place tickets-create writes.
 
 export async function handler(event) {
   try {
-    if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, body: 'Method Not Allowed' };
+    const qp = event.queryStringParameters || {};
+    const id = (qp.id || '').trim();
+
+    if (!id) {
+      return { statusCode: 400, body: 'Missing id' };
     }
 
-    // ✅ Dynamically import the CJS helper without createRequire()
+    // Use the same storage helper used by tickets-create
     const mod = await import('./storage.cjs');
     const storage = mod.default || mod;
 
-    const body = JSON.parse(event.body || '{}');
-
-    const id = genId();
-    const now = new Date().toISOString();
-
-    const ticket = {
-      id,
-      createdAt: now,
-      status: 'waiting',
-      priority: body.priority || 'C',
-      kt: body.kt,
-      name: body.name,
-      phone: body.phone,
-      acute: !!body.acute,
-      complaint: body.complaint || '',
-      notes: body.notes || '',
-      redFlags: Array.isArray(body.redFlags) ? body.redFlags : [],
-    };
-
-    await storage.writeTicket(id, ticket);
+    const ticket = await storage.readTicket(id); // must use same key logic as writeTicket
+    if (!ticket) {
+      return {
+        statusCode: 404,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ok: false, error: 'not_found', id }),
+      };
+    }
 
     return {
       statusCode: 200,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ok: true, id }),
+      body: JSON.stringify({ ok: true, ticket }),
     };
   } catch (err) {
     return {
       statusCode: 502,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        errorMessage: err.message,
-        errorType: err.name,
-        trace: (err.stack || '').split('\n').slice(0, 12),
+        ok: false,
+        error: err.message,
+        trace: (err.stack || '').split('\n').slice(0, 10),
       }),
     };
   }
