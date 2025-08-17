@@ -1,35 +1,58 @@
-const { getStore } = require('./storage.cjs');
-
+// netlify/functions/tickets-create.js
 exports.handler = async (event) => {
+  const { getStore } = await import('@netlify/blobs');
+
+  const siteID =
+    process.env.BLOBS_SITE_ID ||
+    process.env.SITE_ID ||
+    process.env.NETLIFY_SITE_ID;
+
+  const token =
+    process.env.BLOBS_TOKEN ||
+    process.env.NETLIFY_API_TOKEN ||
+    process.env.NETLIFY_TOKEN;
+
+  const store = getStore({
+    name: 'clinic-queue',
+    ...(siteID ? { siteID } : {}),
+    ...(token ? { token } : {}),
+  });
+
   try {
     if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, body: 'Method Not Allowed' };
-    }
-    const body = JSON.parse(event.body || '{}');
-
-    const kt = String(body.kt || '').replace(/\D/g, '');
-    const name = String(body.name || '').trim();
-    const phone = String(body.phone || '').trim();
-    const acute = !!body.acute;
-    const complaint = body.complaint || '';
-    const details = body.details || '';
-    const redFlags = Array.isArray(body.redFlags) ? body.redFlags : [];
-
-    if (!(kt && kt.length === 10 && name && phone)) {
-      return { statusCode: 400, body: JSON.stringify({ ok: false, error: 'Missing or invalid fields' }) };
+      return { statusCode: 405, body: 'Use POST' };
     }
 
-    const id = 't-' + Math.random().toString(36).slice(2, 8);
-    const createdAt = new Date().toISOString();
-    const priority = acute ? 'A' : (redFlags.length ? 'B' : 'C');
+    const body = event.body ? JSON.parse(event.body) : {};
+    const id = body.id || Math.random().toString(36).slice(2, 8);
+    const now = new Date().toISOString();
 
-    const ticket = { id, kt, name, phone, acute, complaint, details, redFlags, priority, status: 'waiting', createdAt };
+    const ticket = {
+      id,
+      createdAt: now,
+      status: 'waiting',
+      priority: body.priority || 'C',
+      kt: body.kt || '',
+      name: body.name || '',
+      phone: body.phone || '',
+      acute: !!body.acute,
+      complaint: body.complaint || '',
+      notes: body.notes || '',
+      redFlags: Array.isArray(body.redFlags) ? body.redFlags : [],
+    };
 
-    const store = await getStore('tickets');
-    await store.setJSON(id, ticket);
+    await store.setJSON(`tickets/${id}.json`, ticket);
 
-    return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: true, ticket }) };
+    return {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ok: true, ticket }),
+    };
   } catch (err) {
-    return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ok: false, error: err.message, stack: err.stack }) };
+    return {
+      statusCode: 500,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ok: false, error: String(err?.message || err) }),
+    };
   }
 };
