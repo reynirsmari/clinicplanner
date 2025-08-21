@@ -1,27 +1,15 @@
-const { ticketKey, getJson } = require('./_shared/storage.js');
+const { getTicketsStore } = require('./_shared/store');
 
 module.exports.handler = async (event) => {
-  const id = (event.queryStringParameters && event.queryStringParameters.id) || '';
-  if (!id) {
-    return {
-      statusCode: 400,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ok: false, error: 'Missing id' }),
-    };
+  try {
+    const id = (event.queryStringParameters && event.queryStringParameters.id) || '';
+    if (!id) return { statusCode: 400, body: JSON.stringify({ ok:false, error: 'Missing id' }) };
+    const store = await getTicketsStore();
+    const key = `tickets/${id}.json`;
+    const json = await store.get(key, { type: 'json' });
+    if (!json) return { statusCode: 404, body: JSON.stringify({ ok:false, error: 'Not found' }) };
+    return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:true, ticket: json }) };
+  } catch (err) {
+    return { statusCode: 500, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:false, error: err.message }) };
   }
-
-  const obj = await getJson(ticketKey(id));
-  if (!obj) {
-    return {
-      statusCode: 404,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ok: false, error: 'Not found' }),
-    };
-  }
-
-  return {
-    statusCode: 200,
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ok: true, item: obj }),
-  };
 };
