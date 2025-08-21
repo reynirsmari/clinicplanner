@@ -2,137 +2,86 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Your ticket</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: dark; }
-    body{font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      margin:0; background:#0b0c10; color:#e5e7eb;}
-    .wrap{max-width:960px;margin:40px auto;padding:24px;border-radius:24px;background:linear-gradient(180deg,#0f1115,#0b0c10) no-repeat;border:1px solid rgba(255,255,255,0.06);box-shadow:0 10px 40px rgba(0,0,0,0.35)}
-    h1{font-size:42px;margin:0 0 8px;}
-    .muted{color:#a1a1aa}
-    .card{margin-top:24px;padding:20px;border-radius:16px;background:#11131a;border:1px solid rgba(255,255,255,0.06)}
-    .row{display:flex;gap:20px;flex-wrap:wrap}
-    .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:600}
-    .pill.waiting{background:#122033;color:#9ac7ff;border:1px solid #1a365d}
-    .pill.called{background:#0f2f19;color:#91f2b4;border:1px solid #1d6b3d}
-    .big{font-size:48px;font-weight:800;letter-spacing:-0.02em}
-    .warn{margin-top:16px;padding:14px;border-radius:12px;background:#1a1322;border:1px solid #3a264d;color:#e9d5ff}
-    .ok{margin-top:16px;padding:14px;border-radius:12px;background:#0f2f19;border:1px solid #1d6b3d;color:#b7f7cf}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    @media (max-width:700px){.grid{grid-template-columns:1fr}}
+    :root{
+      --bg:#f7f8fb;--card:#fff;--text:#121826;--muted:#6b7280;--good:#16a34a;--border:#e5e7eb;--accent:#0ea5e9;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:760px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:24px}
+    h1{margin:0 0 6px;font-weight:800;letter-spacing:-.02em}
+    p.lead{margin:0 0 16px;color:var(--muted)}
+    .pill{display:inline-block;background:#eef6ff;color:#0369a1;border-radius:999px;padding:8px 12px;font-weight:700}
+    .notice{margin-top:10px;border-left:4px solid var(--accent);padding:8px 12px;background:#eef6ff;color:#075985;border-radius:8px}
+    .ok{background:#ecfdf5;color:#065f46;border-left-color:var(--good)}
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <h1>Your ticket</h1>
-    <p class="muted">Keep this page open. We’ll update your status automatically.</p>
-
+  <div class="wrap">
     <div class="card">
-      <div class="row">
-        <div>Ticket ID: <strong id="tid">—</strong></div>
-        <div>Status: <span id="status" class="pill waiting">waiting</span></div>
+      <h1>Your ticket</h1>
+      <p class="lead">Keep this page open. We’ll update your status automatically.</p>
+      <div id="statusRow">
+        <span id="queuePill" class="pill">Loading position…</span>
+        <div id="advice" class="notice" style="display:none"></div>
+        <div id="notify" class="notice ok" style="display:none">It’s your turn. Please proceed to the reception desk.</div>
       </div>
-      <div class="grid" style="margin-top:10px">
-        <div>
-          <div class="muted">Your position</div>
-          <div class="big" id="position">—</div>
-        </div>
-        <div>
-          <div class="muted">Updated</div>
-          <div id="updated">—</div>
-        </div>
-      </div>
-      <div id="advice" class="warn" style="display:none"></div>
-      <div id="called" class="ok" style="display:none"></div>
     </div>
-  </main>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const ticketId = params.get('id');
 
-  <script type="module">
-    const qs = new URLSearchParams(location.search);
-    const id = qs.get("id");
-    const $ = (sel)=>document.querySelector(sel);
-    $("#tid").textContent = id || "—";
+    const pill = document.getElementById('queuePill');
+    const advice = document.getElementById('advice');
+    const notifyBox = document.getElementById('notify');
 
-    const fmt = (d)=> new Date(d).toLocaleString();
-
-    async function fetchJSON(url, opts={}){
-      const res = await fetch(url, opts);
-      if(!res.ok) throw new Error(await res.text());
-      return res.json();
-    }
-
-    async function getTicket() {
-      // hit the function; if not found, return null
+    async function getPosition() {
       try {
-        const data = await fetchJSON(`/api/tickets-get?id=${encodeURIComponent(id)}`);
-        return data && data.ok !== false ? data : null;
-      } catch (e) {
-        return null;
-      }
-    }
+        const [listRes, getRes] = await Promise.all([
+          fetch('/api/tickets-list'),
+          fetch('/api/tickets-get?id=' + encodeURIComponent(ticketId))
+        ]);
+        const list = await listRes.json().catch(()=>({items:[]}));
+        const ticket = await getRes.json().catch(()=>null);
 
-    async function getList() {
-      try {
-        const data = await fetchJSON(`/api/tickets-list`);
-        return data.items || [];
-      } catch (e) {
-        return [];
-      }
-    }
-
-    function render(ticket, items){
-      if(!ticket){
-        $("#status").textContent = "not found";
-        $("#position").textContent = "—";
-        $("#advice").style.display = "none";
-        $("#called").style.display = "none";
-        return;
-      }
-      const pos = (()=>{
-        const waiting = items
-          .map(x=>x.value || x) // support either shape
-          .filter(t=>t && t.status !== "done" && t.createdAt)
-          .sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
-        const idx = waiting.findIndex(t=>t.id === ticket.id);
-        return idx === -1 ? "—" : (idx + 1);
-      })();
-
-      $("#position").textContent = pos;
-      $("#status").textContent = ticket.status || "waiting";
-      $("#status").className = "pill " + ((ticket.status === "called") ? "called" : "waiting");
-      $("#updated").textContent = fmt(new Date());
-
-      const advice = $("#advice");
-      const called = $("#called");
-      if(ticket.status === "called"){
-        called.style.display = "";
-        called.textContent = "It’s your turn. Please proceed to the reception desk now.";
-        advice.style.display = "none";
-      } else {
-        called.style.display = "none";
-        if (typeof pos === "number" && pos <= 4) {
-          advice.style.display = "";
-          advice.textContent = "You are approaching the front of the line. Please ensure you are in the waiting area so we can call you promptly.";
-        } else {
-          advice.style.display = "none";
+        if (getRes.status === 404 || !ticket) {
+          pill.textContent = 'Ticket not found';
+          return;
         }
+
+        const waiting = (list.items || []).filter(x => x.status === 'waiting')
+          .sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+        const pos = waiting.findIndex(x => x.id === ticketId);
+        if (pos >= 0) {
+          const spot = pos + 1;
+          pill.textContent = `You are #${spot} in line`;
+          advice.style.display = spot <= 4 ? 'block' : 'none';
+          advice.textContent = 'You are approaching the front of the line. Please ensure you are in the waiting area so we can call you promptly.';
+        } else {
+          // Not waiting anymore; check status for "called" or removed
+          if (ticket.status === 'called') {
+            notifyBox.style.display = 'block';
+            pill.textContent = 'Please proceed to reception';
+          } else {
+            pill.textContent = 'Ticket not found';
+          }
+        }
+      } catch (e) {
+        // swallow
       }
     }
 
-    async function cycle(){
-      if(!id) return;
-      const [ticket, items] = await Promise.all([getTicket(), getList()]);
-      render(ticket, items);
+    if (!ticketId) {
+      pill.textContent = 'Missing ticket id';
+    } else {
+      getPosition();
+      setInterval(getPosition, 8000);
     }
-
-    // gentle polling
-    await cycle();
-    setInterval(cycle, 4000);
   </script>
 </body>
 </html>

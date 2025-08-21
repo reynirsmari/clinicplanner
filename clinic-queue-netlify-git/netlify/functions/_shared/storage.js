@@ -1,72 +1,70 @@
 
-// netlify/functions/_shared/storage.js (ESM)
-let _store;
+// CommonJS helper that works with both modern and legacy @netlify/blobs APIs.
+/* eslint-disable */
+const STORE_NAME = process.env.BLOBS_STORE || 'queue';
 
-/**
- * Resolve site/token in all the ways folks typically configure Netlify.
- */
-function resolveSiteId() {
-  return (
-    process.env.BLOBS_SITE_ID ||
-    process.env.SITE_ID ||
-    process.env.NETLIFY_SITE_ID ||
-    ""
-  );
-}
-function resolveToken() {
-  return (
-    process.env.BLOBS_TOKEN ||
-    process.env.NETLIFY_API_TOKEN ||
-    process.env.NETLIFY_TOKEN ||
-    ""
-  );
-}
-function resolveStoreName() {
-  return process.env.BLOBS_STORE || "queue";
+function readEnv(name) {
+  return process.env[name] || process.env['NETLIFY_' + name] || process.env[name.replace('BLOBS_', '')];
 }
 
-async function ensureSdk() {
-  // Load lazily to avoid bundling surprises
-  const mod = await import("@netlify/blobs");
-  // Some bundlers place the API on default
-  return mod.getStore || (mod.default && mod.default.getStore);
-}
-
-export async function ensureStore() {
-  if (_store) return _store;
-  const getStore = await ensureSdk();
-  if (typeof getStore !== "function") {
-    throw new Error("Netlify Blobs SDK not available: getStore is not a function");
+function getStoreCompat() {
+  let mod;
+  try { mod = require('@netlify/blobs'); } catch (e) { mod = null; }
+  if (!mod) {
+    throw new Error('Netlify Blobs SDK not available');
   }
-  _store = getStore({
-    name: resolveStoreName(),
-    siteID: resolveSiteId(),
-    token: resolveToken(),
-  });
-  return _store;
+
+  // Modern API: getStore({ name })
+  if (typeof mod.getStore === 'function') {
+    return mod.getStore({ name: STORE_NAME });
+  }
+
+  // Legacy API: createClient({ siteId, token }).getStore(name)
+  if (typeof mod.createClient === 'function') {
+    const siteId = readEnv('BLOBS_SITE_ID') || readEnv('SITE_ID') || readEnv('SITEID');
+    const token  = readEnv('BLOBS_TOKEN')    || readEnv('API_TOKEN') || readEnv('TOKEN');
+    if (!siteId || !token) {
+      const err = new Error('Missing Netlify Blobs credentials');
+      err.details = { siteId: !!siteId, token: !!token };
+      throw err;
+    }
+    const client = mod.createClient({ siteId, token });
+    return client.getStore(STORE_NAME);
+  }
+
+  throw new Error('Unsupported @netlify/blobs API shape');
 }
 
-export function ticketKey(id) {
-  return `tickets/${id}.json`;
+async function putJson(key, value) {
+  const store = getStoreCompat();
+  if (typeof store.setJSON === 'function') return store.setJSON(key, value);
+  if (typeof store.put === 'function') return store.put(key, JSON.stringify(value), { contentType: 'application/json' });
+  throw new Error('No put method on store');
 }
 
-export async function putJson(key, value) {
-  const store = await ensureStore();
-  await store.setJSON(key, value);
+async function getJson(key) {
+  const store = getStoreCompat();
+  if (typeof store.getJSON === 'function') return store.getJSON(key);
+  if (typeof store.get === 'function') {
+    const res = await store.get(key);
+    if (!res) return null;
+    if (typeof res.json === 'function') return res.json();
+    try { return JSON.parse(res); } catch { return null; }
+  }
+  throw new Error('No get method on store');
 }
 
-export async function getJson(key) {
-  const store = await ensureStore();
-  return await store.getJSON(key);
+async function list(prefix) {
+  const store = getStoreCompat();
+  if (typeof store.list === 'function') return store.list({ prefix });
+  throw new Error('No list method on store');
 }
 
-export async function list(prefix = "") {
-  const store = await ensureStore();
-  const { objects = [] } = await store.list({ prefix });
-  return objects;
+async function del(key) {
+  const store = getStoreCompat();
+  if (typeof store.delete === 'function') return store.delete(key);
+  if (typeof store.del === 'function') return store.del(key);
+  throw new Error('No delete method on store');
 }
 
-export async function del(key) {
-  const store = await ensureStore();
-  await store.delete(key);
-}
+module.exports = { getStoreCompat, putJson, getJson, list, del };

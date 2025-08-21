@@ -1,26 +1,26 @@
 
-// netlify/functions/tickets-delete.js (ESM)
-import { del, ticketKey } from "./_shared/storage.js";
+/* eslint-disable */
+const { getJson, del } = require('./_shared/storage.js');
 
-function json(status, data) {
-  return {
-    statusCode: status,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  };
-}
-
-export async function handler(event) {
-  if (event.httpMethod !== "DELETE") {
-    return json(405, { ok: false, error: "Method Not Allowed" });
-  }
-  const id = event.queryStringParameters?.id;
-  if (!id) return json(400, { ok: false, error: "Missing id" });
-
+exports.handler = async (event) => {
   try {
-    await del(ticketKey(id));
-    return json(200, { ok: true });
+    if (event.httpMethod !== 'DELETE' && event.httpMethod !== 'POST') {
+      // Allow POST as well for environments that don't allow DELETE from browsers easily.
+      return { statusCode: 405, body: JSON.stringify({ ok: false, error: 'Method Not Allowed' }) };
+    }
+    const params = new URLSearchParams(event.queryStringParameters || {});
+    const id = params.get('id') || (event.queryStringParameters && event.queryStringParameters.id);
+    if (!id) {
+      return { statusCode: 400, body: JSON.stringify({ ok: false, error: 'Missing id' }) };
+    }
+    const key = `tickets/${id}.json`;
+    const exists = await getJson(key);
+    if (!exists) {
+      return { statusCode: 404, body: JSON.stringify({ ok: false, error: 'Ticket not found' }) };
+    }
+    await del(key);
+    return { statusCode: 200, body: JSON.stringify({ ok: true, id }) };
   } catch (err) {
-    return json(200, { ok: false, error: String(err?.message || err) });
+    return { statusCode: 500, body: JSON.stringify({ ok: false, error: err.message }) };
   }
-}
+};
