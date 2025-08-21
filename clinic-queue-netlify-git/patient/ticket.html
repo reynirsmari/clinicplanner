@@ -1,11 +1,61 @@
-<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Your ticket</title>
-<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:2rem}.card{padding:1rem;border:1px solid #ddd;border-radius:8px;max-width:480px}.dim{color:#666}</style></head>
-<body><h1>Your ticket</h1><div id="card" class="card">Loading…</div><p class="dim">This page auto‑refreshes every 8s.</p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Your Ticket</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 8c2-4 12-4 14 0M3 12c2-5 16-5 18 0M5 16c2 4 12 4 14 0" stroke="#7aa2ff" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <div>Your Ticket</div>
+        <span class="badge">Patient</span>
+      </div>
+      <a class="kv" href="/patient/">New check‑in</a>
+    </div>
+
+    <div class="card" style="padding:26px;">
+      <div id="content">Loading…</div>
+    </div>
+
+    <div class="footer">Keep this page open — we’ll update automatically.</div>
+  </div>
+
 <script>
-const params=new URLSearchParams(location.search);const id=params.get('id');
-async function load(){const res=await fetch(`/api/tickets-get?id=${id}`);
-if(res.status===404){document.getElementById('card').textContent='Ticket not found.';return}
-const data=await res.json();if(!data.ok){document.getElementById('card').textContent=data.error||'Error';return}
-const t=data.ticket;document.getElementById('card').innerHTML=`<h2>#${t.id}</h2><div><strong>Status:</strong> ${t.status}</div><div><strong>Name:</strong> ${t.name}</div><div><strong>Priority:</strong> ${t.priority}</div><div><strong>Complaint:</strong> ${t.complaint||''}</div><div class="dim">Created: ${new Date(t.createdAt).toLocaleString()}</div>`}
-load();setInterval(load,8000);
-</script></body></html>
+function getParam(k){ return new URL(location.href).searchParams.get(k); }
+const id = getParam('id');
+const $content = document.getElementById('content');
+
+async function load(){
+  if(!id){ $content.innerHTML = '<p>Ticket not found.</p>'; return; }
+  try{
+    const res = await fetch('/api/tickets-get?id=' + encodeURIComponent(id));
+    if(!res.ok){ $content.innerHTML = '<p>Ticket not found.</p>'; return; }
+    const data = await res.json();
+    if(!data || !data.item){ $content.innerHTML = '<p>Ticket not found.</p>'; return; }
+    const t = data.item;
+    const created = t.createdAt ? new Date(t.createdAt) : null;
+    $content.innerHTML = `
+      <h2 style="margin:0 0 8px">Ticket <span class="kv">${t.id}</span></h2>
+      <div class="helper time">${created ? created.toLocaleString() : ''}</div>
+      <div style="height:12px"></div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+        <div class="field"><label>Name</label><div>${t.name || '-'}</div></div>
+        <div class="field"><label>National ID</label><div>${t.kt || '-'}</div></div>
+        <div class="field"><label>Phone</label><div>${t.phone || '-'}</div></div>
+        <div class="field"><label>Complaint</label><div>${t.complaint || '-'}</div></div>
+        <div class="field" style="grid-column:1/-1;"><label>Notes</label><div>${(t.notes || '').replace(/</g,'&lt;')}</div></div>
+      </div>
+    `;
+  }catch(e){
+    $content.innerHTML = '<p>Ticket not found.</p>';
+  }
+}
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

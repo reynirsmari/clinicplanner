@@ -1,17 +1,121 @@
-<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Check‑In</title>
-<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:2rem}label{display:block;margin-top:.75rem}input,select,textarea{width:320px;padding:.5rem}button{margin-top:1rem;padding:.6rem 1rem}</style></head>
-<body><h1>Patient check‑in</h1>
-<form id="f"><label>Full name* <input name="name" required/></label>
-<label>KT <input name="kt"/></label>
-<label>Phone <input name="phone"/></label>
-<label>Complaint <input name="complaint"/></label>
-<label>Priority <select name="priority"><option value="C">C</option><option value="B">B</option><option value="A">A</option></select></label>
-<label><input type="checkbox" name="acute"/> Acute?</label>
-<label>Notes <textarea name="notes" rows="3"></textarea></label>
-<button type="submit">Get my ticket</button></form>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clinic Check‑In</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 8c2-4 12-4 14 0M3 12c2-5 16-5 18 0M5 16c2 4 12 4 14 0" stroke="#7aa2ff" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <div>Clinic Check‑In</div>
+        <span class="badge">Patient</span>
+      </div>
+      <div class="kv">Secure & Private</div>
+    </div>
+
+    <div class="card">
+      <form class="form" id="form">
+        <h2>Tell us about your visit</h2>
+
+        <div class="field">
+          <label for="name">Full name *</label>
+          <input id="name" required placeholder="Jane Doe" autocomplete="name">
+        </div>
+
+        <div class="field">
+          <label for="kt">National ID *</label>
+          <input id="kt" required placeholder="e.g. 010101-1234" inputmode="numeric" autocomplete="off">
+        </div>
+
+        <div class="field">
+          <label for="phone">Phone *</label>
+          <input id="phone" required placeholder="e.g. 770-555-0140" inputmode="tel" autocomplete="tel">
+        </div>
+
+        <div class="field">
+          <label for="complaint">Main complaint *</label>
+          <select id="complaint" required>
+            <option value="">Select one…</option>
+            <option>Respiratory</option>
+            <option>Injury</option>
+            <option>Gastrointestinal</option>
+            <option>Dermatology</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <div class="field" style="grid-column:1/-1;">
+          <label for="notes">Anything else we should know?</label>
+          <textarea id="notes" placeholder="Optional notes…"></textarea>
+          <div class="helper">Do not include sensitive details you prefer not to share.</div>
+        </div>
+
+        <div class="field" style="grid-column:1/-1;">
+          <label>Urgent symptoms (optional)</label>
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <label class="pill red"><input type="checkbox" value="chest-pain" style="accent-color:#ff453a"> Chest pain</label>
+            <label class="pill red"><input type="checkbox" value="severe-bleeding" style="accent-color:#ff453a"> Severe bleeding</label>
+            <label class="pill red"><input type="checkbox" value="breath-at-rest" style="accent-color:#ff453a"> Breath at rest</label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-ghost" type="reset">Clear</button>
+          <button class="btn btn-primary" type="submit">Get my ticket</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="footer">Powered by Netlify — data stored securely with Netlify Blobs.</div>
+  </div>
+
 <script>
-const $=q=>document.querySelector(q);
-$('#f').addEventListener('submit',async(e)=>{e.preventDefault();const fd=new FormData(e.target);const payload=Object.fromEntries(fd.entries());payload.acute=fd.get('acute')==='on';
-const r=await fetch('/api/tickets-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const out=await r.json();
-if(out.ok){location.href=`/patient/ticket.html?id=${out.id}`}else{alert('Sorry, we could not create your ticket. '+(out.error||''))}});
-</script></body></html>
+function makeId(len=5){
+  return Math.random().toString(36).slice(2, 2+len);
+}
+
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const get = id => document.getElementById(id).value.trim();
+  const id = makeId();
+  const redFlags = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
+
+  const payload = {
+    id,
+    createdAt: new Date().toISOString(),
+    status: 'waiting',
+    name: get('name'),
+    kt: get('kt'),
+    phone: get('phone'),
+    complaint: get('complaint'),
+    notes: get('notes'),
+    redFlags
+  };
+
+  try{
+    const res = await fetch('/api/tickets-create', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(!res.ok || data.ok === false){
+      const msg = (data && (data.error || data.message)) || res.statusText;
+      alert('Sorry, we could not create your ticket.\n' + msg);
+      return;
+    }
+    // Use server id if it returned one
+    const ticketId = (data && (data.id || (data.item && data.item.id))) || id;
+    location.href = '/patient/ticket.html?id=' + encodeURIComponent(ticketId);
+  }catch(err){
+    alert('Sorry, something went wrong. Please try again.');
+    console.error(err);
+  }
+});
+</script>
+</body>
+</html>
