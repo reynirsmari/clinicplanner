@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,190 +6,117 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Clinic queue</title>
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #0b0c10;
-      --panel: #11131a;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --border: rgba(255,255,255,.08);
-      --accent: #60a5fa;
-      --ok: #22c55e;
-      --warn: #f59e0b;
-      --shadow: 0 10px 30px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.03) inset;
-      --radius: 16px;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: radial-gradient(1200px 700px at 100% -10%, #0d1220 0, #090a0f 60%, #08090d 100%); color: var(--text); font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 24px clamp(20px, 4vw, 48px);
-    }
-    h1 { font-size: clamp(24px, 3.5vw, 34px); letter-spacing: -0.02em; margin: 0; }
-    main { padding: 0 clamp(20px, 4vw, 48px) 32px; }
-    .panel {
-      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
-    th { text-align: left; color: var(--muted); font-weight: 500; }
-    tr:last-child td { border-bottom: none; }
-    .row { cursor: pointer; }
-    .badge { display:inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight:600; }
-    .badge.waiting { background: rgba(96,165,250,.15); color:#93c5fd; }
-    .badge.called { background: rgba(34,197,94,.15); color:#22c55e; }
-    .actions { display:flex; gap:8px; }
-    .btn { padding: 8px 12px; border-radius: 10px; border:1px solid var(--border); background: rgba(255,255,255,.02); color:var(--text); cursor:pointer; }
-    .btn:hover { background: rgba(255,255,255,.04); }
-    .btn-primary { border-color: rgba(96,165,250,.35); background: rgba(37,99,235,.25); }
-    .btn-danger  { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.15); }
-    .empty { text-align: center; color: var(--muted); padding: 28px; }
-    .details { background: rgba(255,255,255,.03); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); margin-top: 8px; }
-    .muted { color: var(--muted); }
+    :root { color-scheme: dark; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0c10;color:#e5e7eb;margin:0}
+    .wrap{max-width:1000px;margin:32px auto;padding:20px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:#101219}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}
+    th{color:#a1a1aa;text-align:left}
+    details{background:#0f1117;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:8px 12px}
+    details[open]{outline:1px solid rgba(255,255,255,.12)}
+    .actions button{margin-right:8px;border:0;border-radius:10px;padding:8px 12px;font-weight:600}
+    .notify{background:#14532d;color:#c7f9d4}
+    .delete{background:#3f1d2b;color:#ffd6e0}
+    .light{color:#cbd5e1}
   </style>
 </head>
 <body>
-  <header>
-    <h1>Clinic queue</h1>
-    <div class="muted" id="lastUpdated">—</div>
-  </header>
-
-  <main>
-    <div class="panel">
-      <table id="queue">
-        <thead>
-          <tr>
-            <th style="width:26%">Patient</th>
-            <th style="width:24%">Primary complaint</th>
-            <th style="width:20%">Created</th>
-            <th style="width:30%">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="rows">
-          <tr><td colspan="4" class="empty">Loading…</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <main class="wrap">
+    <h1>Queue</h1>
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Primary complaint</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
   </main>
 
-  <template id="row-tpl">
-    <tr class="row" data-id="">
-      <td class="patient"></td>
-      <td class="complaint"></td>
-      <td class="created"></td>
-      <td class="actions">
-        <button class="btn btn-primary" data-action="notify">Notify</button>
-        <button class="btn btn-danger" data-action="delete">Delete</button>
-      </td>
-    </tr>
-    <tr class="detail-row" hidden>
-      <td colspan="4">
-        <div class="details"></div>
-      </td>
-    </tr>
-  </template>
+  <script type="module">
+    const rows = document.getElementById("rows");
+    const OPEN_KEY = "clinic_open_ids";
 
-  <script>
-    const $rows = document.querySelector('#rows');
-    const $tpl = document.querySelector('#row-tpl');
-    const $updated = document.querySelector('#lastUpdated');
-
-    async function getJSON(url, opts) {
-      const res = await fetch(url, opts);
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    }
-
-    function fmtTime(iso) {
-      const d = new Date(iso);
-      return d.toLocaleString();
-    }
-
-    function detailsHTML(t) {
-      const yesno = v => v ? 'Yes' : 'No';
-      return `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
-          <div><div class="muted">Name</div><div>${t.name || '—'}</div></div>
-          <div><div class="muted">ID</div><div>${t.kt || '—'}</div></div>
-          <div><div class="muted">Phone</div><div>${t.phone || '—'}</div></div>
-          <div><div class="muted">Priority</div><div>${t.priority || '—'}</div></div>
-          <div><div class="muted">Status</div><div><span class="badge ${t.status || 'waiting'}">${(t.status || 'waiting')}</span></div></div>
-          <div><div class="muted">Created</div><div>${fmtTime(t.createdAt)}</div></div>
-          <div style="grid-column:1/-1;"><div class="muted">Notes</div><div>${(t.notes || '—')}</div></div>
-        </div>
-      `;
-    }
-
-    function render(list) {
-      $rows.innerHTML = '';
-      if (!list.length) {
-        $rows.innerHTML = '<tr><td colspan="4" class="empty">No patients in queue.</td></tr>';
-        return;
-      }
-      for (const t of list) {
-        const frag = $tpl.content.cloneNode(true);
-        const tr = frag.querySelector('tr.row');
-        const trDetail = frag.querySelector('tr.detail-row');
-        tr.dataset.id = t.id;
-
-        frag.querySelector('.patient').innerHTML = `
-          <strong>${t.name || '—'}</strong>
-          <div class="muted" style="font-size:12px">#${t.id}</div>
-        `;
-        frag.querySelector('.complaint').textContent = t.complaint || '—';
-        frag.querySelector('.created').textContent = fmtTime(t.createdAt);
-
-        tr.addEventListener('click', async (e) => {
-          // ignore if clicking buttons
-          if (e.target.closest('button')) return;
-          if (trDetail.hasAttribute('hidden')) {
-            const full = await getJSON(`/api/tickets-get?id=${encodeURIComponent(t.id)}`);
-            trDetail.querySelector('.details').innerHTML = detailsHTML(full);
-            trDetail.removeAttribute('hidden');
-          } else {
-            trDetail.setAttribute('hidden','');
-          }
-        });
-
-        // action buttons
-        frag.querySelector('[data-action="notify"]').addEventListener('click', async (e) => {
-          e.stopPropagation();
-          try {
-            await getJSON(`/api/tickets-notify?id=${encodeURIComponent(t.id)}`, { method:'POST' });
-            await refresh();
-          } catch (err) { alert('Failed to notify: ' + err.message); }
-        });
-
-        frag.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
-          e.stopPropagation();
-          if (!confirm('Mark patient as done and remove from queue?')) return;
-          try {
-            await getJSON(`/api/tickets-delete?id=${encodeURIComponent(t.id)}`, { method:'DELETE' });
-            await refresh();
-          } catch (err) { alert('Failed to delete: ' + err.message); }
-        });
-
-        $rows.appendChild(frag);
-      }
-    }
-
-    async function refresh() {
+    function loadOpenSet(){
       try {
-        const data = await getJSON('/api/tickets-list');
-        const waiting = (data.items || [])
-          .sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
-        render(waiting);
-        $updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
-      } catch (err) {
-        $rows.innerHTML = '<tr><td colspan="4" class="empty">Error loading queue.</td></tr>';
-      }
+        return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || "[]"));
+      } catch { return new Set(); }
+    }
+    function saveOpenSet(s){
+      localStorage.setItem(OPEN_KEY, JSON.stringify([...s]));
     }
 
-    refresh();
+    function tr(item, openSet){
+      const t = item.value || item;
+      const id = t.id;
+      const open = openSet.has(id);
+      const created = new Date(t.createdAt).toLocaleString();
+
+      const el = document.createElement("tr");
+      el.innerHTML = `
+        <td style="width:33%">
+          <details data-id="${id}" ${open ? "open" : ""}>
+            <summary><strong>${t.name}</strong> <span class="light">(#${id})</span></summary>
+            <div class="light" style="margin-top:8px">
+              <div><strong>KT:</strong> ${t.kt}</div>
+              <div><strong>Phone:</strong> ${t.phone}</div>
+              <div><strong>Notes:</strong> ${t.notes || "—"}</div>
+              <div><strong>Status:</strong> ${t.status || "waiting"}</div>
+            </div>
+          </details>
+        </td>
+        <td>${t.complaint || "—"}</td>
+        <td>${created}</td>
+        <td class="actions">
+          <button class="notify" data-act="notify" data-id="${id}">Notify</button>
+          <button class="delete" data-act="delete" data-id="${id}">Delete</button>
+        </td>`;
+      return el;
+    }
+
+    rows.addEventListener("click", async (e)=>{
+      const btn = e.target.closest("button[data-act]");
+      if(!btn) return;
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      if(act === "notify"){
+        const res = await fetch(`/api/tickets-notify?id=${encodeURIComponent(id)}`, { method:"POST" });
+        const data = await res.json().catch(()=>({ok:false}));
+        if(!data.ok) alert("Failed to notify: " + JSON.stringify(data));
+      } else if (act === "delete"){
+        if(!confirm("Remove this patient from the queue?")) return;
+        const res = await fetch(`/api/tickets-delete?id=${encodeURIComponent(id)}`, { method:"DELETE" });
+        const data = await res.json().catch(()=>({ok:false}));
+        if(!data.ok) alert("Failed to delete: " + JSON.stringify(data));
+      }
+      await refresh(); // reflect immediately
+    });
+
+    rows.addEventListener("toggle", (e)=>{
+      if(e.target.tagName !== "DETAILS") return;
+      const id = e.target.dataset.id;
+      const set = loadOpenSet();
+      if(e.target.open) set.add(id); else set.delete(id);
+      saveOpenSet(set);
+    }, true);
+
+    async function fetchJSON(url){
+      const r = await fetch(url);
+      if(!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    async function refresh(){
+      const openSet = loadOpenSet();
+      const data = await fetchJSON("/api/tickets-list");
+      rows.innerHTML = "";
+      (data.items || []).forEach(item => rows.appendChild(tr(item, openSet)));
+    }
+
+    await refresh();
     setInterval(refresh, 4000);
   </script>
 </body>

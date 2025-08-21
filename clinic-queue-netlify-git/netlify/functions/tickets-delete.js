@@ -1,41 +1,26 @@
-// netlify/functions/tickets-delete.js
-// Deletes (archives) a ticket from the queue. Use HTTP DELETE or POST with ?id=...
 
-const { getStore } = require('./_shared/storage');
+// netlify/functions/tickets-delete.js (ESM)
+import { del, ticketKey } from "./_shared/storage.js";
 
-async function getTicketsStore() {
-  const storeName = process.env.BLOBS_STORE || 'queue';
-  const store = await getStore(storeName);
-  return store;
+function json(status, data) {
+  return {
+    statusCode: status,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  };
 }
 
-module.exports.handler = async (event) => {
-  if (event.httpMethod !== 'DELETE' && event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ ok:false, error: 'Method Not Allowed' }) };
+export async function handler(event) {
+  if (event.httpMethod !== "DELETE") {
+    return json(405, { ok: false, error: "Method Not Allowed" });
   }
+  const id = event.queryStringParameters?.id;
+  if (!id) return json(400, { ok: false, error: "Missing id" });
+
   try {
-    const url = new URL(event.rawUrl || `https://${event.headers.host}${event.path}`);
-    let id = url.searchParams.get('id');
-    if (!id && event.body) {
-      try { id = JSON.parse(event.body).id } catch {}
-    }
-    if (!id) {
-      return { statusCode: 400, body: JSON.stringify({ ok:false, error:'Missing id' }) };
-    }
-
-    const store = await getTicketsStore();
-    const key = `tickets/${id}.json`;
-
-    const existing = await store.get(key, { type: 'json' });
-    if (!existing) {
-      return { statusCode: 404, body: JSON.stringify({ ok:false, error:'Not found' }) };
-    }
-
-    // You can "soft delete" by setting status, but many teams prefer a hard delete:
-    await store.delete(key);
-
-    return { statusCode: 200, body: JSON.stringify({ ok:true, id }) };
+    await del(ticketKey(id));
+    return json(200, { ok: true });
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ ok:false, error: err.message }) };
+    return json(200, { ok: false, error: String(err?.message || err) });
   }
-};
+}

@@ -2,107 +2,70 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Clinic Check‑In</title>
-  <link rel="stylesheet" href="/assets/app.css"/>
-  <script defer>
-    async function submitForm(e){
-      e.preventDefault();
-      const form = e.target;
-      const data = Object.fromEntries(new FormData(form).entries());
-      // strip empty
-      Object.keys(data).forEach(k=>{ if(typeof data[k]==="string") data[k]=data[k].trim(); });
-      // POST to Netlify function
-      const res = await fetch('/.netlify/functions/tickets-create', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(data)
-      });
-      const out = await res.json().catch(()=>({}));
-      if(!res.ok || !out.id){
-        alert('Sorry, we could not create your ticket. Please try again.');
-        return;
-      }
-      sessionStorage.setItem('lastTicketId', out.id);
-      location.href = `/patient/ticket.html?id=${encodeURIComponent(out.id)}`;
-    }
-  </script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Check-in</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; background:#0b0c10; color:#e5e7eb}
+    .wrap{max-width:920px;margin:40px auto;padding:24px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:#101219}
+    label{display:block;margin:14px 0 6px;color:#cbd5e1}
+    input, select, textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #263043;background:#0f1117;color:#e5e7eb}
+    button{margin-top:16px;padding:12px 16px;border-radius:12px;border:0;background:#2563eb;color:white;font-weight:700}
+  </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <h1>Check‑in</h1>
-      <p class="lead">Please complete the form below so we can register your visit.</p>
-
-      <form class="grid two" onsubmit="submitForm(event)">
-        <div>
-          <label for="name">Full name *</label>
-          <input required id="name" name="name" autocomplete="name" placeholder="Jane Doe"/>
-        </div>
-        <div>
-          <label for="kt">National ID / SSN *</label>
-          <input required id="kt" name="kt" placeholder="e.g. 3006852189"/>
-        </div>
-
-        <div>
-          <label for="phone">Phone *</label>
-          <input required id="phone" name="phone" autocomplete="tel" placeholder="e.g. 6605725"/>
-        </div>
-        <div>
-          <label for="priority">Priority</label>
-          <select id="priority" name="priority">
-            <option value="C">Routine</option>
-            <option value="B">Soon</option>
-            <option value="A">Urgent</option>
-          </select>
-        </div>
-
-        <div class="grid two" style="grid-column:1/-1">
-          <div>
-            <label for="complaint">Primary complaint *</label>
-            <select id="complaint" name="complaint" required>
-              <option value="Respiratory">Respiratory</option>
-              <option value="Cardiovascular">Cardiovascular</option>
-              <option value="Gastrointestinal">Gastrointestinal</option>
-              <option value="Musculoskeletal">Musculoskeletal</option>
-              <option value="Neurological">Neurological</option>
-              <option value="Dermatological">Dermatological</option>
-              <option value="ENT">Ear / Nose / Throat</option>
-              <option value="Ophthalmologic">Eye</option>
-              <option value="Genitourinary">Genitourinary</option>
-              <option value="Gynecological">Gynecological</option>
-              <option value="Endocrine / Diabetes">Endocrine / Diabetes</option>
-              <option value="General / Constitutional">General / Constitutional</option>
-              <option value="Mental health">Mental health</option>
-              <option value="Medication refill">Medication refill</option>
-              <option value="Administrative">Administrative / certificate / test request</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div id="complaint-other-wrap" style="display:none">
-            <label for="complaintOther">If other, please specify</label>
-            <input id="complaintOther" name="complaintOther" placeholder="Describe briefly"/>
-          </div>
-        </div>
-
-        <div style="grid-column:1/-1">
-          <label for="notes">Notes (optional)</label>
-          <textarea id="notes" name="notes" placeholder="Anything else you would like us to know?"></textarea>
-        </div>
-
-        <div class="actions" style="grid-column:1/-1">
-          <button type="submit">Get my ticket</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script>
-    const sel=document.getElementById('complaint');
-    const wrap=document.getElementById('complaint-other-wrap');
-    sel.addEventListener('change',()=>{
-      wrap.style.display = sel.value==='Other' ? 'block':'none';
+  <main class="wrap">
+    <h1>Patient check‑in</h1>
+    <form id="f">
+      <label>Full name</label>
+      <input required name="name" placeholder="Jane Doe" />
+      <label>National ID / KT</label>
+      <input required name="kt" />
+      <label>Phone</label>
+      <input required name="phone" />
+      <label>Primary complaint</label>
+      <select name="complaint">
+        <option>Respiratory</option>
+        <option>Gastrointestinal</option>
+        <option>Dermatological</option>
+        <option>Musculoskeletal</option>
+        <option>Neurological</option>
+        <option>Ophthalmological</option>
+        <option>ENT (Ear, Nose, Throat)</option>
+        <option>Urological</option>
+        <option>Gynecological</option>
+        <option>General</option>
+      </select>
+      <label>Notes (optional)</label>
+      <textarea name="notes" rows="4" placeholder="Short notes for the clinic"></textarea>
+      <button type="submit">Get my ticket</button>
+    </form>
+  </main>
+  <script type="module">
+    const form = document.getElementById("f");
+    form.addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(form).entries());
+      // build record expected by API
+      payload.acute = false; // removed from UI, keep schema simple
+      payload.status = "waiting";
+      payload.createdAt = new Date().toISOString();
+      try{
+        const res = await fetch("/api/tickets-create", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if(data && data.id){
+          location.href = `/patient/ticket.html?id=${encodeURIComponent(data.id)}`;
+        } else {
+          alert("Sorry, we could not create your ticket. Please try again.");
+        }
+      }catch(err){
+        alert("Sorry, something went wrong. Please try again.");
+      }
     });
   </script>
 </body>

@@ -1,49 +1,31 @@
-// netlify/functions/tickets-notify.js
-// Marks a ticket as "called" so the patient's ticket page can show a green banner.
-//
-// NOTE: This uses the same helper as your other functions:
-//   const { getStore } = require('./_shared/storage')
-// Make sure _shared/storage.js exists (it was in your repo earlier).
 
-const { getStore } = require('./_shared/storage');
+// netlify/functions/tickets-notify.js (ESM)
+import { getJson, putJson, ticketKey } from "./_shared/storage.js";
 
-async function getTicketsStore() {
-  const storeName = process.env.BLOBS_STORE || 'queue';
-  const store = await getStore(storeName);
-  return store;
+function json(status, data) {
+  return {
+    statusCode: status,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  };
 }
 
-module.exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ ok:false, error: 'Method Not Allowed' }) };
+export async function handler(event) {
+  if (event.httpMethod !== "POST") {
+    return json(405, { ok: false, error: "Method Not Allowed" });
   }
+  const id = event.queryStringParameters?.id;
+  if (!id) return json(400, { ok: false, error: "Missing id" });
+
   try {
-    const url = new URL(event.rawUrl || `https://${event.headers.host}${event.path}`);
-    let id = url.searchParams.get('id');
-    if (!id && event.body) {
-      try { id = JSON.parse(event.body).id } catch {}
-    }
-    if (!id) {
-      return { statusCode: 400, body: JSON.stringify({ ok:false, error:'Missing id' }) };
-    }
-
-    const store = await getTicketsStore();
-    const key = `tickets/${id}.json`;
-
-    const existing = await store.get(key, { type: 'json' });
-    if (!existing) {
-      return { statusCode: 404, body: JSON.stringify({ ok:false, error:'Not found' }) };
-    }
-
-    existing.status = 'called';
-    existing.notifiedAt = new Date().toISOString();
-
-    await store.put(key, JSON.stringify(existing), {
-      httpMetadata: { contentType: 'application/json' }
-    });
-
-    return { statusCode: 200, body: JSON.stringify({ ok:true, id, status: existing.status }) };
+    const key = ticketKey(id);
+    const doc = await getJson(key);
+    if (!doc) return json(404, { ok: false, error: "Not found" });
+    doc.status = "called";
+    doc.calledAt = new Date().toISOString();
+    await putJson(key, doc);
+    return json(200, { ok: true });
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ ok:false, error: err.message }) };
+    return json(200, { ok: false, error: String(err?.message || err) });
   }
-};
+}
