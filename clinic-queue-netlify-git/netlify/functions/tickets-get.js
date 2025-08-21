@@ -1,17 +1,27 @@
+const { ticketKey, getJson } = require('./_shared/storage.js');
 
-import { getJson } from './_shared/storage.js';
-
-export async function handler(event) {
-  const id = event.queryStringParameters?.id;
+module.exports.handler = async (event) => {
+  const id = (event.queryStringParameters && event.queryStringParameters.id) || '';
   if (!id) {
-    return { statusCode: 400, body: 'Missing id' };
+    return {
+      statusCode: 400,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ok: false, error: 'Missing id' }),
+    };
   }
-  const data = await getJson(`tickets/${id}.json`);
-  if (!data) return { statusCode: 404, body: 'Not found' };
+
+  const obj = await getJson(ticketKey(id));
+  if (!obj) {
+    return {
+      statusCode: 404,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ok: false, error: 'Not found' }),
+    };
+  }
 
   return {
     statusCode: 200,
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ok: true, item: obj }),
   };
-}
+};
