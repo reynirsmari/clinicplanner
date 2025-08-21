@@ -3,91 +3,107 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Patient check‑in</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Clinic Check‑In</title>
   <link rel="stylesheet" href="/assets/app.css"/>
+  <script defer>
+    async function submitForm(e){
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form).entries());
+      // strip empty
+      Object.keys(data).forEach(k=>{ if(typeof data[k]==="string") data[k]=data[k].trim(); });
+      // POST to Netlify function
+      const res = await fetch('/.netlify/functions/tickets-create', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(data)
+      });
+      const out = await res.json().catch(()=>({}));
+      if(!res.ok || !out.id){
+        alert('Sorry, we could not create your ticket. Please try again.');
+        return;
+      }
+      sessionStorage.setItem('lastTicketId', out.id);
+      location.href = `/patient/ticket.html?id=${encodeURIComponent(out.id)}`;
+    }
+  </script>
 </head>
 <body>
   <div class="container">
     <div class="card">
-      <div class="header">
-        <div>
-          <h1>Check‑in</h1>
-          <p class="lead">Please fill in your details. We’ll add you to today’s queue.</p>
-        </div>
-        <a class="badge" href="/clinic/">For staff →</a>
-      </div>
+      <h1>Check‑in</h1>
+      <p class="lead">Please complete the form below so we can register your visit.</p>
 
-      <form id="f" class="row">
+      <form class="grid two" onsubmit="submitForm(event)">
         <div>
-          <div class="label">Full name *</div>
-          <input class="input" name="name" required autocomplete="name" />
+          <label for="name">Full name *</label>
+          <input required id="name" name="name" autocomplete="name" placeholder="Jane Doe"/>
         </div>
-
         <div>
-          <div class="label">Kennitala (ID)</div>
-          <input class="input" name="kt" inputmode="numeric" maxlength="10" minlength="10" placeholder="10 digits"/>
+          <label for="kt">National ID / SSN *</label>
+          <input required id="kt" name="kt" placeholder="e.g. 3006852189"/>
         </div>
 
         <div>
-          <div class="label">Phone *</div>
-          <input class="input" name="phone" required inputmode="numeric" maxlength="7" placeholder="7 digits"/>
+          <label for="phone">Phone *</label>
+          <input required id="phone" name="phone" autocomplete="tel" placeholder="e.g. 6605725"/>
         </div>
-
         <div>
-          <div class="label">Primary complaint *</div>
-          <select name="complaint" class="input" required>
-            <option value="" disabled selected>Select…</option>
-            <option>Respiratory</option>
-            <option>Fever</option>
-            <option>Stomach</option>
-            <option>Injury</option>
-            <option>Other</option>
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority">
+            <option value="C">Routine</option>
+            <option value="B">Soon</option>
+            <option value="A">Urgent</option>
           </select>
         </div>
 
-        <div style="grid-column:1/-1">
-          <div class="label">Notes (optional)</div>
-          <textarea class="input" name="notes" placeholder="Anything we should know in advance?"></textarea>
+        <div class="grid two" style="grid-column:1/-1">
+          <div>
+            <label for="complaint">Primary complaint *</label>
+            <select id="complaint" name="complaint" required>
+              <option value="Respiratory">Respiratory</option>
+              <option value="Cardiovascular">Cardiovascular</option>
+              <option value="Gastrointestinal">Gastrointestinal</option>
+              <option value="Musculoskeletal">Musculoskeletal</option>
+              <option value="Neurological">Neurological</option>
+              <option value="Dermatological">Dermatological</option>
+              <option value="ENT">Ear / Nose / Throat</option>
+              <option value="Ophthalmologic">Eye</option>
+              <option value="Genitourinary">Genitourinary</option>
+              <option value="Gynecological">Gynecological</option>
+              <option value="Endocrine / Diabetes">Endocrine / Diabetes</option>
+              <option value="General / Constitutional">General / Constitutional</option>
+              <option value="Mental health">Mental health</option>
+              <option value="Medication refill">Medication refill</option>
+              <option value="Administrative">Administrative / certificate / test request</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div id="complaint-other-wrap" style="display:none">
+            <label for="complaintOther">If other, please specify</label>
+            <input id="complaintOther" name="complaintOther" placeholder="Describe briefly"/>
+          </div>
         </div>
 
-        <div style="grid-column:1/-1; display:flex; gap:12px; align-items:center; justify-content:flex-end; margin-top:6px">
-          <button class="btn" type="submit">Get my ticket</button>
+        <div style="grid-column:1/-1">
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" name="notes" placeholder="Anything else you would like us to know?"></textarea>
+        </div>
+
+        <div class="actions" style="grid-column:1/-1">
+          <button type="submit">Get my ticket</button>
         </div>
       </form>
-
-      <p class="footer-note">By checking in you agree to our privacy policy.</p>
     </div>
   </div>
 
-<script>
-const F = document.getElementById('f');
-const CREATE_URL = '/.netlify/functions/tickets-create';
-
-F.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const fd = new FormData(F);
-  const payload = Object.fromEntries(fd.entries());
-  if(payload.phone){ payload.phone = payload.phone.replace(/\D+/g,'').slice(-7); }
-  try{
-    const res = await fetch(CREATE_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
+  <script>
+    const sel=document.getElementById('complaint');
+    const wrap=document.getElementById('complaint-other-wrap');
+    sel.addEventListener('change',()=>{
+      wrap.style.display = sel.value==='Other' ? 'block':'none';
     });
-    const data = await res.json().catch(()=>({}));
-    if(data && data.id){ sessionStorage.setItem('lastTicketId', data.id); }
-    if(!res.ok || !data || !data.id){
-      alert('Sorry, we could not create your ticket. Please try again.');
-      console.warn('Create response', data);
-      return;
-    }
-    location.href = `/patient/ticket.html?id=${encodeURIComponent(data.id)}`;
-  }catch(err){
-    console.error(err);
-    alert('Network error. Please try again.');
-  }
-});
-</script>
+  </script>
 </body>
 </html>

@@ -3,75 +3,84 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Your ticket</title>
   <link rel="stylesheet" href="/assets/app.css"/>
+  <script>
+    const POLL_MS = 5000;
+    let currentId = new URL(location.href).searchParams.get('id') || sessionStorage.getItem('lastTicketId') || '';
+    function setStatus(text){ document.getElementById('status').textContent = text; }
+    function setNumber(n){
+      const el = document.getElementById('qnum');
+      if(n==null){ el.textContent = '—'; el.parentElement.style.display='none'; return; }
+      el.textContent = n;
+      el.parentElement.style.display='block';
+    }
+    function setAdvisory(show){
+      const box = document.getElementById('advisory');
+      box.style.display = show ? 'block' : 'none';
+    }
+    async function poll(){
+      if(!currentId){ setStatus('Ticket not found.'); setNumber(null); return; }
+      try{
+        // 1) Get my ticket
+        const tRes = await fetch(`/.netlify/functions/tickets-get?id=${encodeURIComponent(currentId)}`);
+        const my = await tRes.json();
+        if(!tRes.ok || !my || !my.id){ setStatus('Ticket not found.'); setNumber(null); return; }
+
+        // 2) Compute my position using tickets-list
+        const lRes = await fetch('/.netlify/functions/tickets-list');
+        const list = await lRes.json();
+        let waiting = (list.items||[]).filter(x => (x.status||'waiting')==='waiting');
+        waiting.sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+        const pos = waiting.findIndex(x => x.id===my.id);
+        if(pos>=0){
+          const number = pos+1;
+          setNumber(number);
+          setStatus(number===1 ? 'You are next.' : 'Waiting in queue');
+          setAdvisory(number<=4);
+        }else{
+          // If not in waiting, show status
+          if(my.status==='called'){
+            setStatus('It’s your turn. Please proceed to the reception.')
+            setNumber(0);
+          }else if(my.status==='done'){
+            setStatus('Visit completed. Thank you.');
+            setNumber(null);
+          }else{
+            setStatus('Updating…'); setNumber(null);
+          }
+        }
+      }catch(e){
+        setStatus('Updating…'); // transient errors
+      }
+      setTimeout(poll, POLL_MS);
+    }
+    window.addEventListener('DOMContentLoaded', ()=>{
+      document.getElementById('tid').textContent = currentId || '—';
+      poll();
+    });
+  </script>
 </head>
 <body>
   <div class="container">
     <div class="card">
-      <div class="header">
-        <div>
-          <h1>Your ticket</h1>
-          <p class="lead">Keep this page open. We’ll update your status automatically.</p>
-        </div>
-        <a class="badge" href="/patient/">Back to form</a>
+      <h1>Your ticket</h1>
+      <p class="lead">Keep this page open. We’ll update your status automatically.</p>
+
+      <div class="kv">
+        <div class="item">Ticket ID: <span class="mono" id="tid">—</span></div>
+        <div class="item" style="display:none">Queue position: <strong>#<span id="qnum">—</span></strong></div>
       </div>
 
-      <div id="statusArea" class="center">
-        <div id="statusLine" style="font-size:28px; margin:40px 0 6px">Loading…</div>
-        <div class="ticket-id mono" id="ticketId"></div>
-        <div id="tips" class="dim" style="margin-top:18px"></div>
+      <div class="notice warn" id="advisory" style="display:none">
+        You are approaching the front of the line. Please make sure you are in the waiting area so we can call you promptly.
+      </div>
+
+      <div class="center" style="margin:40px 0 10px">
+        <h2 id="status">Updating…</h2>
       </div>
     </div>
   </div>
-
-<script>
-const GET_URL = '/.netlify/functions/tickets-get';
-
-function getTicketId(){
-  const p = new URLSearchParams(location.search);
-  return p.get('id') || sessionStorage.getItem('lastTicketId') || '';
-}
-
-let ticketId = getTicketId();
-const idEl = document.getElementById('ticketId');
-const statusEl = document.getElementById('statusLine');
-const tipsEl = document.getElementById('tips');
-
-if(!ticketId){
-  statusEl.textContent = 'Ticket not found.';
-} else {
-  idEl.textContent = 'ID: ' + ticketId;
-  poll();
-  setInterval(poll, 5000);
-}
-
-async function poll(){
-  try{
-    const res = await fetch(`${GET_URL}?id=${encodeURIComponent(ticketId)}`, { headers:{'Accept':'application/json'} });
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok || !data || !data.ok){
-      statusEl.textContent = 'Ticket not found.';
-      tipsEl.textContent = '';
-      return;
-    }
-    statusEl.textContent = humanStatus(data.ticket?.status || 'waiting');
-    tipsEl.textContent = data.position != null ? `People ahead of you: ${data.position}` : '';
-  }catch(e){
-    console.warn(e);
-    statusEl.textContent = 'Connection issue. Retrying…';
-  }
-}
-
-function humanStatus(s){
-  switch(String(s)){
-    case 'waiting': return 'Waiting in queue';
-    case 'called': return 'It’s your turn — please come in';
-    case 'done': return 'Visit completed';
-    default: return 'Waiting in queue';
-  }
-}
-</script>
 </body>
 </html>

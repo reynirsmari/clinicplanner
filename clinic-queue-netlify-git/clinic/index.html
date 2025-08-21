@@ -3,63 +3,94 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Clinic queue</title>
   <link rel="stylesheet" href="/assets/app.css"/>
+  <script>
+    const POLL_MS = 4000;
+    async function list(){
+      const res = await fetch('/.netlify/functions/tickets-list');
+      const data = await res.json();
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML='';
+      let items = data.items||[];
+      // waiting first, then others
+      items.sort((a,b)=>{
+        const aw=(a.status||'waiting')==='waiting'?0:1;
+        const bw=(b.status||'waiting')==='waiting'?0:1;
+        if(aw!==bw) return aw-bw;
+        return new Date(a.createdAt)-new Date(b.createdAt);
+      });
+      for(const t of items){
+        const tr = document.createElement('tr');
+        const status=t.status||'waiting';
+        const dot = status==='waiting'?'dot-wait':status==='called'?'dot-called':'dot-done';
+        tr.innerHTML = `
+          <td><span class="status-dot ${dot}"></span></td>
+          <td><strong>${escapeHtml(t.name||'')}</strong><div class="small mono">${escapeHtml(t.id)}</div></td>
+          <td>${escapeHtml(t.complaint||'-')}</td>
+          <td class="small">${new Date(t.createdAt).toLocaleString()}</td>
+          <td class="row">
+            <div class="left">
+              <button class="secondary" data-expand="${t.id}">Details</button>
+              <button class="danger" data-del="${t.id}">Delete</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+        // expandable details row
+        const tr2=document.createElement('tr');
+        tr2.style.display='none';
+        tr2.setAttribute('data-details', t.id);
+        tr2.innerHTML = `<td colspan="5">
+          <div class="notice">
+            <div class="grid two">
+              <div><strong>KT</strong><div class="small mono">${escapeHtml(t.kt||'')}</div></div>
+              <div><strong>Phone</strong><div class="small mono">${escapeHtml(t.phone||'')}</div></div>
+            </div>
+            <div style="margin-top:10px"><strong>Notes</strong><div class="small">${escapeHtml(t.notes||'—')}</div></div>
+          </div>
+        </td>`;
+        tbody.appendChild(tr2);
+      }
+    }
+    function escapeHtml(s){
+      return (s??'').toString().replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+    async function removeTicket(id){
+      if(!confirm('Remove this ticket?')) return;
+      const res = await fetch(`/.netlify/functions/tickets-delete?id=${encodeURIComponent(id)}`, { method:'DELETE' });
+      if(!res.ok){ alert('Could not remove ticket'); }
+      await list();
+    }
+    document.addEventListener('click', (e)=>{
+      const del = e.target.closest('[data-del]');
+      if(del){ removeTicket(del.getAttribute('data-del')); }
+      const exp = e.target.closest('[data-expand]');
+      if(exp){
+        const id = exp.getAttribute('data-expand');
+        const row = document.querySelector(`tr[data-details="${CSS.escape(id)}"]`);
+        if(row){ row.style.display = (row.style.display==='none'?'':'none')==='none'?'':'none'; } // toggle
+        // actually toggle cleanly
+        row.style.display = row.style.display==='none' ? '' : 'none';
+      }
+    });
+    async function loop(){ await list(); setTimeout(loop, POLL_MS); }
+    window.addEventListener('DOMContentLoaded', loop);
+  </script>
 </head>
 <body>
   <div class="container">
     <div class="card">
-      <div class="header">
-        <div>
-          <h1>Today’s queue</h1>
-          <p class="lead">Newest tickets appear automatically.</p>
-        </div>
-        <a class="badge" href="/patient/">Patient check‑in →</a>
-      </div>
-
-      <div id="list"></div>
+      <h1>Queue</h1>
+      <p class="lead">Live list of check‑ins.</p>
+      <table class="table">
+        <thead>
+          <tr><th></th><th>Patient</th><th>Primary complaint</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
     </div>
   </div>
-
-<script>
-const LIST_URL = '/.netlify/functions/tickets-list';
-const listEl = document.getElementById('list');
-
-async function load(){
-  try{
-    const res = await fetch(LIST_URL);
-    const data = await res.json().catch(()=>({}));
-    if(!data.ok){ listEl.innerHTML = '<p class="dim">Could not load queue.</p>'; return; }
-    render(data.items || []);
-  }catch(e){
-    console.warn(e);
-    listEl.innerHTML = '<p class="dim">Network error. Retrying…</p>';
-  }
-}
-
-function render(items){
-  if(!items.length){
-    listEl.innerHTML = '<p class="dim">No one in queue.</p>';
-    return;
-  }
-  listEl.innerHTML = items.map((t, i) => `
-    <div style="display:flex; gap:12px; align-items:center; justify-content:space-between;
-                background:var(--panel-2); border:1px solid rgba(255,255,255,.08); border-radius:var(--radius-sm);
-                padding:14px 16px; margin:10px 0">
-      <div>
-        <div style="font-weight:600">${escapeHtml(t.name || 'Unknown')}</div>
-        <div class="dim" style="font-size:13px">${escapeHtml(t.complaint || '')}</div>
-      </div>
-      <div class="dim" style="font-size:12px">#${i+1}</div>
-    </div>
-  `).join('');
-}
-
-function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-
-load();
-setInterval(load, 6000);
-</script>
 </body>
 </html>
