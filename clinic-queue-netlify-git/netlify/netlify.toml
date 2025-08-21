@@ -4,8 +4,9 @@
   publish = "."
   functions = "netlify/functions"
 
-# Map /api/* to your serverless functions
+# Map /api/* to your serverless functions  
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+from = "/api/*"
+to   = "/.netlify/functions/:splat"
+status = 200
+force = true
