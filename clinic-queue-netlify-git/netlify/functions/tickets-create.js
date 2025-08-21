@@ -1,8 +1,10 @@
+const { ticketKey, putJson } = require('./_shared/storage.js');
 
-import { randomBytes } from 'node:crypto';
-import { putJson } from './_shared/storage.js';
+function newId() {
+  return Math.random().toString(36).slice(2, 7);
+}
 
-export async function handler(event) {
+module.exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -11,30 +13,39 @@ export async function handler(event) {
     };
   }
 
-  let body = {};
   try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
+    const data = JSON.parse(event.body || '{}');
+
+    const id = data.id || newId();
+    const createdAt = new Date().toISOString();
+
+    const item = {
+      id,
+      createdAt,
+      status: 'waiting',
+      // basic fields expected by the UI
+      name: data.name || '',
+      kt: data.kt || '',
+      phone: data.phone || '',
+      priority: data.priority || 'C',
+      complaint: data.complaint || '',
+      acute: !!data.acute,
+      notes: data.notes || '',
+      redFlags: Array.isArray(data.redFlags) ? data.redFlags : [],
+    };
+
+    await putJson(ticketKey(id), item);
+
     return {
-      statusCode: 400,
+      statusCode: 201,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ok: false, error: 'Invalid JSON' }),
+      body: JSON.stringify({ ok: true, id, href: `/patient/ticket.html?id=${id}` }),
+    };
+  } catch (err) {
+    return {
+      statusCode: 500,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ok: false, error: String(err && err.message || err) }),
     };
   }
-
-  const id = body.id || randomBytes(5).toString('hex');
-  const ticket = {
-    id,
-    createdAt: new Date().toISOString(),
-    status: 'waiting',
-    ...body,
-  };
-
-  await putJson(`tickets/${id}.json`, ticket);
-
-  return {
-    statusCode: 200,
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ok: true, id, url: `/patient/ticket.html?id=${id}` }),
-  };
-}
+};
