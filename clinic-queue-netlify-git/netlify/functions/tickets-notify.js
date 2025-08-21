@@ -1,27 +1,28 @@
+const { getJson, putJson } = require('./_shared/storage');
 
-/* eslint-disable */
-const { getJson, putJson } = require('./_shared/storage.js');
-
-exports.handler = async (event) => {
+module.exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
       return { statusCode: 405, body: JSON.stringify({ ok: false, error: 'Method Not Allowed' }) };
     }
-    const params = new URLSearchParams(event.queryStringParameters || {});
-    const id = params.get('id') || (event.queryStringParameters && event.queryStringParameters.id);
+    const { id } = JSON.parse(event.body || '{}');
     if (!id) {
       return { statusCode: 400, body: JSON.stringify({ ok: false, error: 'Missing id' }) };
     }
+
     const key = `tickets/${id}.json`;
     const ticket = await getJson(key);
     if (!ticket) {
-      return { statusCode: 404, body: JSON.stringify({ ok: false, error: 'Ticket not found' }) };
+      return { statusCode: 404, body: JSON.stringify({ ok: false, error: 'Not found' }) };
     }
-    ticket.status = 'called';
+
+    ticket.notified = true;
     ticket.notifiedAt = new Date().toISOString();
+    ticket.status = 'notified';
+
     await putJson(key, ticket);
-    return { statusCode: 200, body: JSON.stringify({ ok: true, id, ticket }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ ok: false, error: err.message }) };
+    return { statusCode: 500, body: JSON.stringify({ ok: false, error: String(err.message || err) }) };
   }
 };

@@ -1,26 +1,24 @@
+const { del, getJson } = require('./_shared/storage');
 
-/* eslint-disable */
-const { getJson, del } = require('./_shared/storage.js');
-
-exports.handler = async (event) => {
+module.exports.handler = async (event) => {
   try {
-    if (event.httpMethod !== 'DELETE' && event.httpMethod !== 'POST') {
-      // Allow POST as well for environments that don't allow DELETE from browsers easily.
+    if (event.httpMethod !== 'POST') {
       return { statusCode: 405, body: JSON.stringify({ ok: false, error: 'Method Not Allowed' }) };
     }
-    const params = new URLSearchParams(event.queryStringParameters || {});
-    const id = params.get('id') || (event.queryStringParameters && event.queryStringParameters.id);
+    const { id } = JSON.parse(event.body || '{}');
     if (!id) {
       return { statusCode: 400, body: JSON.stringify({ ok: false, error: 'Missing id' }) };
     }
+
     const key = `tickets/${id}.json`;
     const exists = await getJson(key);
     if (!exists) {
-      return { statusCode: 404, body: JSON.stringify({ ok: false, error: 'Ticket not found' }) };
+      return { statusCode: 404, body: JSON.stringify({ ok: false, error: 'Not found' }) };
     }
+
     await del(key);
-    return { statusCode: 200, body: JSON.stringify({ ok: true, id }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ ok: false, error: err.message }) };
+    return { statusCode: 500, body: JSON.stringify({ ok: false, error: String(err.message || err) }) };
   }
 };
