@@ -1,9 +1,0 @@
-<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Clinic queue</title>
-<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:2rem}table{border-collapse:collapse;width:100%;max-width:860px}th,td{padding:.5rem .75rem;border-bottom:1px solid #eee;text-align:left}.dim{color:#666}</style></head>
-<body><h1>Queue</h1><p class="dim">Auto-refresh every 6s</p><table id="t"><thead><tr><th>When</th><th>Id</th><th>Priority</th><th>Name</th><th>Complaint</th></tr></thead><tbody></tbody></table>
-<script>
-async function load(){const res=await fetch('/api/tickets-list');const data=await res.json();const tbody=document.querySelector('#t tbody');
-if(!data.ok){tbody.innerHTML=`<tr><td colspan="5">${data.error||'Error'}</td></tr>`;return}
-tbody.innerHTML=data.items.map(x=>`<tr><td class="dim">${new Date(x.createdAt).toLocaleTimeString()}</td><td>${x.id}</td><td>${x.priority}</td><td>${x.name||''}</td><td>${x.complaint||''}</td></tr>`).join('')}
-load();setInterval(load,6000);
-</script></body></html>
