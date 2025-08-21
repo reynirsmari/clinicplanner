@@ -1,5 +1,9 @@
-// netlify/functions/tickets-delete.js
-// Deletes (archives) a ticket from the queue. Use HTTP DELETE or POST with ?id=...
+// netlify/functions/tickets-notify.js
+// Marks a ticket as "called" so the patient's ticket page can show a green banner.
+//
+// NOTE: This uses the same helper as your other functions:
+//   const { getStore } = require('./_shared/storage')
+// Make sure _shared/storage.js exists (it was in your repo earlier).
 
 const { getStore } = require('./_shared/storage');
 
@@ -10,7 +14,7 @@ async function getTicketsStore() {
 }
 
 module.exports.handler = async (event) => {
-  if (event.httpMethod !== 'DELETE' && event.httpMethod !== 'POST') {
+  if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ ok:false, error: 'Method Not Allowed' }) };
   }
   try {
@@ -31,10 +35,14 @@ module.exports.handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ ok:false, error:'Not found' }) };
     }
 
-    // You can "soft delete" by setting status, but many teams prefer a hard delete:
-    await store.delete(key);
+    existing.status = 'called';
+    existing.notifiedAt = new Date().toISOString();
 
-    return { statusCode: 200, body: JSON.stringify({ ok:true, id }) };
+    await store.put(key, JSON.stringify(existing), {
+      httpMetadata: { contentType: 'application/json' }
+    });
+
+    return { statusCode: 200, body: JSON.stringify({ ok:true, id, status: existing.status }) };
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ ok:false, error: err.message }) };
   }

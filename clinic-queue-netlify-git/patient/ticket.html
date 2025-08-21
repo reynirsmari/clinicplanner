@@ -1,86 +1,151 @@
-
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Your ticket</title>
-  <link rel="stylesheet" href="/assets/app.css"/>
-  <script>
-    const POLL_MS = 5000;
-    let currentId = new URL(location.href).searchParams.get('id') || sessionStorage.getItem('lastTicketId') || '';
-    function setStatus(text){ document.getElementById('status').textContent = text; }
-    function setNumber(n){
-      const el = document.getElementById('qnum');
-      if(n==null){ el.textContent = '—'; el.parentElement.style.display='none'; return; }
-      el.textContent = n;
-      el.parentElement.style.display='block';
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0c0f;
+      --panel: #111218;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #7dd3fc;
+      --ok: #22c55e;
+      --shadow: 0 10px 30px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.03) inset;
+      --radius: 16px;
     }
-    function setAdvisory(show){
-      const box = document.getElementById('advisory');
-      box.style.display = show ? 'block' : 'none';
+    * { box-sizing: border-box; }
+    html, body { height: 100%; background: radial-gradient(1000px 600px at 100% 0, #0d1220 0, #090a0f 50%, #08090d 100%); margin: 0; }
+    body { font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: var(--text); display: grid; place-items: center; padding: 32px; }
+    .card {
+      width: min(900px, 96vw);
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+      border-radius: var(--radius);
+      padding: 32px clamp(24px, 5vw, 48px);
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,.06);
     }
-    async function poll(){
-      if(!currentId){ setStatus('Ticket not found.'); setNumber(null); return; }
-      try{
-        // 1) Get my ticket
-        const tRes = await fetch(`/.netlify/functions/tickets-get?id=${encodeURIComponent(currentId)}`);
-        const my = await tRes.json();
-        if(!tRes.ok || !my || !my.id){ setStatus('Ticket not found.'); setNumber(null); return; }
-
-        // 2) Compute my position using tickets-list
-        const lRes = await fetch('/.netlify/functions/tickets-list');
-        const list = await lRes.json();
-        let waiting = (list.items||[]).filter(x => (x.status||'waiting')==='waiting');
-        waiting.sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
-        const pos = waiting.findIndex(x => x.id===my.id);
-        if(pos>=0){
-          const number = pos+1;
-          setNumber(number);
-          setStatus(number===1 ? 'You are next.' : 'Waiting in queue');
-          setAdvisory(number<=4);
-        }else{
-          // If not in waiting, show status
-          if(my.status==='called'){
-            setStatus('It’s your turn. Please proceed to the reception.')
-            setNumber(0);
-          }else if(my.status==='done'){
-            setStatus('Visit completed. Thank you.');
-            setNumber(null);
-          }else{
-            setStatus('Updating…'); setNumber(null);
-          }
-        }
-      }catch(e){
-        setStatus('Updating…'); // transient errors
-      }
-      setTimeout(poll, POLL_MS);
+    h1 {
+      font-size: clamp(28px, 4vw, 44px);
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
     }
-    window.addEventListener('DOMContentLoaded', ()=>{
-      document.getElementById('tid').textContent = currentId || '—';
-      poll();
-    });
-  </script>
+    p.lead { margin: 0 0 24px; color: var(--muted); }
+    .kpis { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .line {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,.02);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .label { color: var(--muted); min-width: 160px; }
+    .value { font-weight: 600; }
+    #called-banner {
+      padding: 12px 16px; border-radius: 12px; margin-top: 12px;
+      background: rgba(34,197,94,.15); color: var(--ok); font-weight: 700;
+    }
+    small.hint { color: var(--muted); display:block; margin-top: 8px; }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <h1>Your ticket</h1>
-      <p class="lead">Keep this page open. We’ll update your status automatically.</p>
+  <main class="card">
+    <h1>Your ticket</h1>
+    <p class="lead">Keep this page open. We’ll update your status automatically.</p>
 
-      <div class="kv">
-        <div class="item">Ticket ID: <span class="mono" id="tid">—</span></div>
-        <div class="item" style="display:none">Queue position: <strong>#<span id="qnum">—</span></strong></div>
+    <div class="kpis">
+      <div class="line">
+        <div class="label">Status</div>
+        <div id="status" class="value">Loading…</div>
       </div>
-
-      <div class="notice warn" id="advisory" style="display:none">
-        You are approaching the front of the line. Please make sure you are in the waiting area so we can call you promptly.
-      </div>
-
-      <div class="center" style="margin:40px 0 10px">
-        <h2 id="status">Updating…</h2>
+      <div class="line">
+        <div class="label">Queue</div>
+        <div id="queuePosition" class="value">—</div>
       </div>
     </div>
-  </div>
+
+    <small id="be-ready" class="hint" style="display:none;"></small>
+  </main>
+
+  <script>
+    const $status = document.querySelector('#status');
+    const $position = document.querySelector('#queuePosition');
+    const $beReady = document.querySelector('#be-ready');
+
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id') || localStorage.getItem('ticketId');
+    if (id) localStorage.setItem('ticketId', id);
+
+    const API = {
+      get: (id) => fetch(`/api/tickets-get?id=${encodeURIComponent(id)}`).then(r => r.json()),
+      list: () => fetch(`/api/tickets-list`).then(r => r.json())
+    };
+
+    async function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+    async function loadTicketWithRetry(id, tries = 8, delayMs = 350) {
+      for (let i = 0; i < tries; i++) {
+        try {
+          const t = await API.get(id);
+          if (t && t.id) return t;
+        } catch {}
+        await wait(delayMs);
+      }
+      return null;
+    }
+
+    function showCalled() {
+      let banner = document.getElementById('called-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'called-banner';
+        $position.parentElement.insertAdjacentElement('afterend', banner);
+      }
+      banner.textContent = 'It’s your turn. Please proceed to the reception desk now.';
+    }
+
+    async function refresh() {
+      if (!id) { $status.textContent = 'Ticket not found.'; return; }
+      const ticket = await loadTicketWithRetry(id);
+      if (!ticket) { $status.textContent = 'Ticket not found.'; return; }
+
+      const data = await API.list();
+      const waiting = (data.items || [])
+        .filter(x => (x.status || 'waiting') === 'waiting')
+        .sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+      if (ticket.status === 'called') {
+        $status.textContent = 'Called';
+        $position.textContent = 'Now';
+        showCalled();
+        $beReady.style.display = 'none';
+        return;
+      }
+
+      const posIndex = waiting.findIndex(x => x.id === ticket.id);
+      if (posIndex === -1) {
+        // Could be just called or completed
+        $status.textContent = (ticket.status || 'waiting').replace(/^\w/, c => c.toUpperCase());
+        $position.textContent = '—';
+        return;
+      }
+
+      const pos = posIndex + 1;
+      $status.textContent = 'Waiting';
+      $position.textContent = `#${pos}`;
+
+      if (pos <= 4) {
+        $beReady.style.display = 'block';
+        $beReady.textContent = 'You are approaching the front of the line. Please ensure you are in the waiting area so we can call you promptly.';
+      } else {
+        $beReady.style.display = 'none';
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
 </body>
 </html>
