@@ -1,48 +1,50 @@
-// snippets/clinic-actions.js
-// Drop this in your clinic page bundle (or import it).
-// It wires up the Notify/Delete buttons using data-id attributes.
-// Requires each button to have data-action="notify|delete" and data-id="TICKET_ID".
-(function () {
-  document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
 
-    const id = btn.dataset.id;
-    if (!id) {
-      alert('No ticket id found on this row.');
+// snippets/clinic-actions.js
+// Minimal wiring for Notify/Delete buttons on the clinic queue page.
+// Looks for elements with [data-action="notify|delete"] and [data-id="<ticket-id>"]
+
+(function () {
+  const $root = document;
+  function toast(msg) {
+    // Fallback alert; replace with a nicer UI if you have one
+    console.log(msg);
+  }
+
+  async function postJSON(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    let data = null;
+    try { data = await res.json(); } catch(e) {}
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  async function handle(action, id) {
+    if (!id) return alert('Missing ticket id');
+    const endpoint = action === 'notify' ? '/api/tickets-notify' : '/api/tickets-delete';
+    const { ok, data } = await postJSON(endpoint, { id });
+    if (!ok || !data || data.ok === false) {
+      alert(`Failed to ${action}: ${JSON.stringify(data || {})}`);
       return;
     }
-
-    try {
-      if (btn.dataset.action === 'notify') {
-        const r = await fetch('/api/tickets-notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        });
-        const j = await r.json();
-        if (!j.ok) throw new Error(j.error || 'Notify failed');
-        // Optional: reflect UI state
-        btn.disabled = true;
-        btn.textContent = 'Notified';
-        btn.classList.add('is-notified');
-      }
-
-      if (btn.dataset.action === 'delete') {
-        if (!confirm('Remove this patient from the queue?')) return;
-        const r = await fetch('/api/tickets-delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        });
-        const j = await r.json();
-        if (!j.ok) throw new Error(j.error || 'Delete failed');
-        // Optional: remove row from DOM
-        const row = btn.closest('[data-ticket-row]') || btn.closest('tr') || btn.closest('li');
-        if (row) row.remove();
-      }
-    } catch (err) {
-      alert(`Failed to ${btn.dataset.action}: ${err.message}`);
+    // trigger a UI refresh if your app uses a reload() or fetchQueue()
+    if (typeof window.fetchQueue === 'function') {
+      try { await window.fetchQueue(); } catch(e) {}
+    } else {
+      // fallback: reload page
+      window.location.reload();
     }
+  }
+
+  $root.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.getAttribute('data-action');
+    if (action !== 'notify' && action !== 'delete') return;
+    const id = el.getAttribute('data-id');
+    e.preventDefault();
+    handle(action, id);
   });
 })();

@@ -1,36 +1,66 @@
-// netlify/functions/tickets-notify.js
-// Marks a ticket as 'notified' so the patient sees the green banner.
-// Expects: POST with JSON body { id: "ticketId" }
-const { ensureStore } = require('./_shared/storage');
 
-const json = (status, body) => ({
-  statusCode: status,
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(body),
-});
+// netlify/functions/tickets-notify.js
+// Marks a ticket as "notified" so the patient sees a green message.
+// POST /api/tickets-notify  body: { id: "abc123" }
+const parseJson = async (event) => {
+  try {
+    if (!event.body) return null;
+    return JSON.parse(event.body);
+  } catch (e) {
+    return null;
+  }
+};
+
+// Dynamic ESM import so this works in CommonJS functions
+async function getStoreCompat() {
+  const { getStore } = await import('@netlify/blobs');
+  const siteID =
+    process.env.BLOBS_SITE_ID ||
+    process.env.NETLIFY_SITE_ID ||
+    process.env.SITE_ID;
+  const token =
+    process.env.BLOBS_TOKEN ||
+    process.env.NETLIFY_API_TOKEN ||
+    process.env.NETLIFY_TOKEN;
+  const name = process.env.BLOBS_STORE || 'queue'; // default store name
+  return getStore({ name, siteID, token });
+}
 
 module.exports.handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ ok: false, error: 'Method Not Allowed' }) };
+  }
+  const payload = await parseJson(event) || {};
+  const id = payload.id || (payload.ticketId);
+  if (!id) {
+    return { statusCode: 400, body: JSON.stringify({ ok: false, error: 'Missing id' }) };
+  }
+
   try {
-    if (event.httpMethod !== 'POST') {
-      return json(405, { ok: false, error: 'Method Not Allowed' });
-    }
-
-    let id;
-    try { id = (JSON.parse(event.body || '{}')).id; } catch (_) {}
-    if (!id) return json(400, { ok: false, error: 'Missing id' });
-
-    const store = await ensureStore();
+    const store = await getStoreCompat();
     const key = `tickets/${id}.json`;
+    // Read existing ticket
+    const existing = await store.get(key, { type: 'json' });
+    if (!existing) {
+      return { statusCode: 404, body: JSON.stringify({ ok: false, error: 'Ticket not found' }) };
+    }
+    // Update
+    existing.status = 'notified';
+    existing.notifiedAt = new Date().toISOString();
 
-    const current = await store.get(key, { type: 'json' });
-    if (!current) return json(404, { ok: false, error: 'Not found' });
+    // Persist
+    await store.set(key, JSON.stringify(existing), {
+      contentType: 'application/json; charset=utf-8'
+    });
 
-    current.status = 'notified';
-    current.notifiedAt = new Date().toISOString();
-
-    await store.set(key, JSON.stringify(current), { 'content-type': 'application/json' });
-    return json(200, { ok: true, id });
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true })
+    };
   } catch (err) {
-    return json(500, { ok: false, error: err.message || 'Server error' });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ ok: false, error: err && err.message ? err.message : String(err) })
+    };
   }
 };
