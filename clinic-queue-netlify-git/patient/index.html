@@ -3,117 +3,106 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clinic Check‑In</title>
+  <title>Check‑In</title>
   <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <div class="brand">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 8c2-4 12-4 14 0M3 12c2-5 16-5 18 0M5 16c2 4 12 4 14 0" stroke="#7aa2ff" stroke-width="1.2" stroke-linecap="round"/></svg>
-        <div>Clinic Check‑In</div>
-        <span class="badge">Patient</span>
-      </div>
-      <div class="kv">Secure & Private</div>
-    </div>
-
     <div class="card">
-      <form class="form" id="form">
-        <h2>Tell us about your visit</h2>
-
-        <div class="field">
-          <label for="name">Full name *</label>
-          <input id="name" required placeholder="Jane Doe" autocomplete="name">
+      <div class="header">
+        <div>
+          <h1>Clinic Check‑In</h1>
+          <p class="muted">Please fill out your details. Fields marked * are required.</p>
         </div>
+        <a class="link small" href="/clinic/">Clinic queue →</a>
+      </div>
 
-        <div class="field">
-          <label for="kt">National ID *</label>
-          <input id="kt" required placeholder="e.g. 010101-1234" inputmode="numeric" autocomplete="off">
+      <form id="form" class="grid cols-2">
+        <div>
+          <label>Full name *</label>
+          <input name="name" required autocomplete="name" />
         </div>
-
-        <div class="field">
-          <label for="phone">Phone *</label>
-          <input id="phone" required placeholder="e.g. 770-555-0140" inputmode="tel" autocomplete="tel">
+        <div>
+          <label>National ID / SSN *</label>
+          <input name="kt" required inputmode="numeric" />
         </div>
-
-        <div class="field">
-          <label for="complaint">Main complaint *</label>
-          <select id="complaint" required>
-            <option value="">Select one…</option>
+        <div>
+          <label>Phone *</label>
+          <input name="phone" required inputmode="tel" autocomplete="tel" />
+        </div>
+        <div>
+          <label>Main complaint *</label>
+          <select name="complaint" required>
+            <option value="">Select…</option>
             <option>Respiratory</option>
-            <option>Injury</option>
-            <option>Gastrointestinal</option>
-            <option>Dermatology</option>
+            <option>Abdominal pain</option>
+            <option>Headache</option>
+            <option>Musculoskeletal</option>
+            <option>Fever</option>
             <option>Other</option>
           </select>
         </div>
-
-        <div class="field" style="grid-column:1/-1;">
-          <label for="notes">Anything else we should know?</label>
-          <textarea id="notes" placeholder="Optional notes…"></textarea>
-          <div class="helper">Do not include sensitive details you prefer not to share.</div>
-        </div>
-
-        <div class="field" style="grid-column:1/-1;">
-          <label>Urgent symptoms (optional)</label>
-          <div style="display:flex; flex-wrap:wrap; gap:10px;">
-            <label class="pill red"><input type="checkbox" value="chest-pain" style="accent-color:#ff453a"> Chest pain</label>
-            <label class="pill red"><input type="checkbox" value="severe-bleeding" style="accent-color:#ff453a"> Severe bleeding</label>
-            <label class="pill red"><input type="checkbox" value="breath-at-rest" style="accent-color:#ff453a"> Breath at rest</label>
+        <div class="cols-2" style="grid-column:1/-1">
+          <div class="row checkbox">
+            <input id="rf1" type="checkbox" value="Severe bleeding">
+            <label for="rf1">Severe bleeding</label>
+          </div>
+          <div class="row checkbox">
+            <input id="rf2" type="checkbox" value="Chest pain">
+            <label for="rf2">Chest pain</label>
+          </div>
+          <div class="row checkbox">
+            <input id="rf3" type="checkbox" value="Shortness of breath at rest">
+            <label for="rf3">Shortness of breath at rest</label>
           </div>
         </div>
-
-        <div class="actions">
-          <button class="btn btn-ghost" type="reset">Clear</button>
-          <button class="btn btn-primary" type="submit">Get my ticket</button>
+        <div style="grid-column:1/-1">
+          <label>Anything the doctor should know?</label>
+          <textarea name="notes" placeholder="Optional"></textarea>
+        </div>
+        <div class="row" style="grid-column:1/-1;justify-content:flex-end;gap:10px">
+          <button type="submit" id="btn">Get my ticket</button>
         </div>
       </form>
+      <p id="msg" class="small" style="margin-top:10px"></p>
     </div>
-
-    <div class="footer">Powered by Netlify — data stored securely with Netlify Blobs.</div>
   </div>
 
 <script>
-function makeId(len=5){
-  return Math.random().toString(36).slice(2, 2+len);
-}
+const api = (p, init) => fetch('/.netlify/functions/' + p, init);
 
-document.getElementById('form').addEventListener('submit', async (e) => {
+const $ = s => document.querySelector(s);
+const form = $('#form');
+const btn  = $('#btn');
+const msg  = $('#msg');
+
+form.addEventListener('submit', async (e)=>{
   e.preventDefault();
-  const get = id => document.getElementById(id).value.trim();
-  const id = makeId();
-  const redFlags = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
-
-  const payload = {
-    id,
-    createdAt: new Date().toISOString(),
-    status: 'waiting',
-    name: get('name'),
-    kt: get('kt'),
-    phone: get('phone'),
-    complaint: get('complaint'),
-    notes: get('notes'),
-    redFlags
-  };
-
-  try{
-    const res = await fetch('/api/tickets-create', {
+  btn.disabled = true; msg.textContent = 'Creating your ticket…';
+  try {
+    const data = {
+      name: form.name.value.trim(),
+      kt: form.kt.value.trim(),
+      phone: form.phone.value.trim(),
+      complaint: form.complaint.value,
+      notes: form.notes.value.trim(),
+      redFlags: Array.from([$('#rf1'),$('#rf2'),$('#rf3')]).filter(i=>i.checked).map(i=>i.value)
+    };
+    const res = await api('tickets-create', {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
     });
-    const data = await res.json();
-    if(!res.ok || data.ok === false){
-      const msg = (data && (data.error || data.message)) || res.statusText;
-      alert('Sorry, we could not create your ticket.\n' + msg);
-      return;
+    const out = await res.json().catch(()=>({ok:false}));
+    if(out.ok && out.id){
+      location.href = `/patient/ticket.html?id=${encodeURIComponent(out.id)}`;
+    }else{
+      throw new Error(out.error||'Failed to create ticket');
     }
-    // Use server id if it returned one
-    const ticketId = (data && (data.id || (data.item && data.item.id))) || id;
-    location.href = '/patient/ticket.html?id=' + encodeURIComponent(ticketId);
-  }catch(err){
-    alert('Sorry, something went wrong. Please try again.');
-    console.error(err);
+  } catch(err){
+    msg.textContent = 'Sorry, we could not create your ticket. Please try again.';
+  } finally {
+    btn.disabled = false;
   }
 });
 </script>

@@ -3,55 +3,73 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Your Ticket</title>
+  <title>Your ticket</title>
   <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <div class="brand">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 8c2-4 12-4 14 0M3 12c2-5 16-5 18 0M5 16c2 4 12 4 14 0" stroke="#7aa2ff" stroke-width="1.2" stroke-linecap="round"/></svg>
-        <div>Your Ticket</div>
-        <span class="badge">Patient</span>
+    <div class="card">
+      <div class="header">
+        <div>
+          <h1>Your ticket</h1>
+          <p class="muted">Keep this page open. We’ll update your status automatically.</p>
+        </div>
+        <a class="link small" href="/patient/">Back to form</a>
       </div>
-      <a class="kv" href="/patient/">New check‑in</a>
+      <div id="content"></div>
     </div>
-
-    <div class="card" style="padding:26px;">
-      <div id="content">Loading…</div>
-    </div>
-
-    <div class="footer">Keep this page open — we’ll update automatically.</div>
   </div>
-
 <script>
-function getParam(k){ return new URL(location.href).searchParams.get(k); }
-const id = getParam('id');
-const $content = document.getElementById('content');
+const api = (p) => fetch('/.netlify/functions/' + p);
+const $ = s => document.querySelector(s);
+const q = new URLSearchParams(location.search);
+const id = q.get('id');
+const content = $('#content');
 
 async function load(){
-  if(!id){ $content.innerHTML = '<p>Ticket not found.</p>'; return; }
+  if(!id){ content.innerHTML = '<div class="center"><h2>Ticket not found.</h2></div>'; return; }
   try{
-    const res = await fetch('/api/tickets-get?id=' + encodeURIComponent(id));
-    if(!res.ok){ $content.innerHTML = '<p>Ticket not found.</p>'; return; }
-    const data = await res.json();
-    if(!data || !data.item){ $content.innerHTML = '<p>Ticket not found.</p>'; return; }
-    const t = data.item;
-    const created = t.createdAt ? new Date(t.createdAt) : null;
-    $content.innerHTML = `
-      <h2 style="margin:0 0 8px">Ticket <span class="kv">${t.id}</span></h2>
-      <div class="helper time">${created ? created.toLocaleString() : ''}</div>
-      <div style="height:12px"></div>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
-        <div class="field"><label>Name</label><div>${t.name || '-'}</div></div>
-        <div class="field"><label>National ID</label><div>${t.kt || '-'}</div></div>
-        <div class="field"><label>Phone</label><div>${t.phone || '-'}</div></div>
-        <div class="field"><label>Complaint</label><div>${t.complaint || '-'}</div></div>
-        <div class="field" style="grid-column:1/-1;"><label>Notes</label><div>${(t.notes || '').replace(/</g,'&lt;')}</div></div>
-      </div>
-    `;
+    const res = await api('tickets-get?id='+encodeURIComponent(id));
+    const out = await res.json();
+    if(out.ok && out.item){
+      const t = out.item;
+      content.innerHTML = `
+        <div class="grid cols-2">
+          <div class="card" style="background:#0e1014; grid-column:1/-1">
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <div class="badge">Ticket ID</div>
+                <h2 style="margin-top:6px">${id}</h2>
+              </div>
+              <div style="text-align:right">
+                <div class="badge">Status</div>
+                <h2 class="status ${t.status}">${t.status}</h2>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="badge">Name</div>
+            <h3 style="margin-top:6px">${t.name||''}</h3>
+          </div>
+          <div>
+            <div class="badge">Phone</div>
+            <h3 style="margin-top:6px">${t.phone||''}</h3>
+          </div>
+          <div>
+            <div class="badge">Complaint</div>
+            <h3 style="margin-top:6px">${t.complaint||''}</h3>
+          </div>
+          <div>
+            <div class="badge">Created</div>
+            <h3 style="margin-top:6px">${new Date(t.createdAt||Date.now()).toLocaleString()}</h3>
+          </div>
+        </div>
+      `;
+    } else {
+      content.innerHTML = '<div class="center"><h2>Ticket not found.</h2></div>';
+    }
   }catch(e){
-    $content.innerHTML = '<p>Ticket not found.</p>';
+    content.innerHTML = '<div class="center"><h2>Ticket not found.</h2></div>';
   }
 }
 load();

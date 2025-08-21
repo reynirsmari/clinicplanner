@@ -3,86 +3,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clinic Queue</title>
+  <title>Clinic queue</title>
   <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <div class="brand">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 8c2-4 12-4 14 0M3 12c2-5 16-5 18 0M5 16c2 4 12 4 14 0" stroke="#7aa2ff" stroke-width="1.2" stroke-linecap="round"/></svg>
-        <div>Clinic Queue</div>
-        <span class="badge">Staff</span>
+    <div class="card">
+      <div class="header">
+        <div>
+          <h1>Queue</h1>
+          <p class="muted">Live list of active tickets. Auto-refresh every 10s.</p>
+        </div>
+        <div class="row">
+          <a class="link small" href="/patient/">Patient form</a>
+          <button class="secondary" id="refresh">Refresh</button>
+        </div>
       </div>
-      <button class="btn btn-primary" id="refreshBtn" title="Refresh now">Refresh</button>
-    </div>
 
-    <div class="card" style="padding: 8px 8px 2px;">
-      <table class="table" id="tbl">
+      <table class="table" id="table">
         <thead>
-          <tr>
-            <th style="width:140px;">Time</th>
-            <th>Name</th>
-            <th style="width:160px;">National ID</th>
-            <th style="width:160px;">Phone</th>
-            <th>Complaint</th>
-            <th style="width:120px;">Ticket</th>
-          </tr>
+          <tr><th>ID</th><th>Name</th><th>Phone</th><th>Complaint</th><th>Created</th><th>Status</th></tr>
         </thead>
-        <tbody id="tbody">
-          <tr><td colspan="6" class="time" style="padding:18px;">Loading…</td></tr>
-        </tbody>
+        <tbody id="tbody"></tbody>
       </table>
+      <div id="empty" class="center small" style="display:none">No tickets yet.</div>
     </div>
-
-    <div class="footer">Auto‑refresh every 10s</div>
   </div>
 
 <script>
-const $tbody = document.getElementById('tbody');
-const $btn = document.getElementById('refreshBtn');
-
-function maskPhone(p){
-  if(!p) return '-';
-  const d = p.replace(/\D/g,'');
-  if(d.length < 7) return p;
-  return d.slice(0,3) + '‑' + d.slice(3,6) + '‑' + d.slice(6);
-}
-
-function row(t){
-  const created = t.createdAt ? new Date(t.createdAt) : null;
-  return \`
-    <tr>
-      <td class="time">\${created ? created.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}</td>
-      <td>\${t.name || '-'}</td>
-      <td>\${t.kt || '-'}</td>
-      <td>\${maskPhone(t.phone)}</td>
-      <td>\${t.complaint || '-'}</td>
-      <td><span class="kv">\${t.id}</span></td>
-    </tr>\`
-}
+const api = (p) => fetch('/.netlify/functions/' + p);
+const tbody = document.querySelector('#tbody');
+const empty = document.querySelector('#empty');
 
 async function load(){
   try{
-    const res = await fetch('/api/tickets-list');
-    const data = await res.json();
-    if(!data || !Array.isArray(data.items)){
-      $tbody.innerHTML = '<tr><td colspan="6" class="time" style="padding:18px;">No data</td></tr>';
-      return;
+    const res = await api('tickets-list');
+    const out = await res.json();
+    tbody.innerHTML = '';
+    const items = (out && out.items) || [];
+    if(items.length === 0){
+      empty.style.display = 'block'; return;
+    } else empty.style.display = 'none';
+
+    for(const t of items){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="small">${t.id||t.key?.replace('tickets/','').replace('.json','')}</td>
+        <td>${t.name||''}</td>
+        <td>${t.phone||''}</td>
+        <td>${t.complaint||''}</td>
+        <td class="small">${t.createdAt ? new Date(t.createdAt).toLocaleString() : ''}</td>
+        <td class="status ${t.status||'waiting'}">${t.status||'waiting'}</td>`;
+      tbody.appendChild(tr);
     }
-    if(data.items.length === 0){
-      $tbody.innerHTML = '<tr><td colspan="6" class="time" style="padding:18px;">No patients waiting</td></tr>';
-      return;
-    }
-    $tbody.innerHTML = data.items
-      .sort((a,b)=> (a.createdAt||'').localeCompare(b.createdAt||''))
-      .map(row).join('');
   }catch(e){
-    $tbody.innerHTML = '<tr><td colspan="6" class="time" style="padding:18px;">Error loading queue</td></tr>';
+    // ignore
   }
 }
-
-$btn.addEventListener('click', load);
+document.querySelector('#refresh').addEventListener('click', load);
 load();
 setInterval(load, 10000);
 </script>
