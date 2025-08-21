@@ -1,108 +1,91 @@
+
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Check‑In</title>
-  <link rel="stylesheet" href="/assets/app.css">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Patient check‑in</title>
+  <link rel="stylesheet" href="/assets/app.css"/>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <div class="header">
         <div>
-          <h1>Clinic Check‑In</h1>
-          <p class="muted">Please fill out your details. Fields marked * are required.</p>
+          <h1>Check‑in</h1>
+          <p class="lead">Please fill in your details. We’ll add you to today’s queue.</p>
         </div>
-        <a class="link small" href="/clinic/">Clinic queue →</a>
+        <a class="badge" href="/clinic/">For staff →</a>
       </div>
 
-      <form id="form" class="grid cols-2">
+      <form id="f" class="row">
         <div>
-          <label>Full name *</label>
-          <input name="name" required autocomplete="name" />
+          <div class="label">Full name *</div>
+          <input class="input" name="name" required autocomplete="name" />
         </div>
+
         <div>
-          <label>National ID / SSN *</label>
-          <input name="kt" required inputmode="numeric" />
+          <div class="label">Kennitala (ID)</div>
+          <input class="input" name="kt" inputmode="numeric" maxlength="10" minlength="10" placeholder="10 digits"/>
         </div>
+
         <div>
-          <label>Phone *</label>
-          <input name="phone" required inputmode="tel" autocomplete="tel" />
+          <div class="label">Phone *</div>
+          <input class="input" name="phone" required inputmode="numeric" maxlength="7" placeholder="7 digits"/>
         </div>
+
         <div>
-          <label>Main complaint *</label>
-          <select name="complaint" required>
-            <option value="">Select…</option>
+          <div class="label">Primary complaint *</div>
+          <select name="complaint" class="input" required>
+            <option value="" disabled selected>Select…</option>
             <option>Respiratory</option>
-            <option>Abdominal pain</option>
-            <option>Headache</option>
-            <option>Musculoskeletal</option>
             <option>Fever</option>
+            <option>Stomach</option>
+            <option>Injury</option>
             <option>Other</option>
           </select>
         </div>
-        <div class="cols-2" style="grid-column:1/-1">
-          <div class="row checkbox">
-            <input id="rf1" type="checkbox" value="Severe bleeding">
-            <label for="rf1">Severe bleeding</label>
-          </div>
-          <div class="row checkbox">
-            <input id="rf2" type="checkbox" value="Chest pain">
-            <label for="rf2">Chest pain</label>
-          </div>
-          <div class="row checkbox">
-            <input id="rf3" type="checkbox" value="Shortness of breath at rest">
-            <label for="rf3">Shortness of breath at rest</label>
-          </div>
-        </div>
+
         <div style="grid-column:1/-1">
-          <label>Anything the doctor should know?</label>
-          <textarea name="notes" placeholder="Optional"></textarea>
+          <div class="label">Notes (optional)</div>
+          <textarea class="input" name="notes" placeholder="Anything we should know in advance?"></textarea>
         </div>
-        <div class="row" style="grid-column:1/-1;justify-content:flex-end;gap:10px">
-          <button type="submit" id="btn">Get my ticket</button>
+
+        <div style="grid-column:1/-1; display:flex; gap:12px; align-items:center; justify-content:flex-end; margin-top:6px">
+          <button class="btn" type="submit">Get my ticket</button>
         </div>
       </form>
-      <p id="msg" class="small" style="margin-top:10px"></p>
+
+      <p class="footer-note">By checking in you agree to our privacy policy.</p>
     </div>
   </div>
 
 <script>
-const api = (p, init) => fetch('/.netlify/functions/' + p, init);
+const F = document.getElementById('f');
+const CREATE_URL = '/.netlify/functions/tickets-create';
 
-const $ = s => document.querySelector(s);
-const form = $('#form');
-const btn  = $('#btn');
-const msg  = $('#msg');
-
-form.addEventListener('submit', async (e)=>{
+F.addEventListener('submit', async (e) => {
   e.preventDefault();
-  btn.disabled = true; msg.textContent = 'Creating your ticket…';
-  try {
-    const data = {
-      name: form.name.value.trim(),
-      kt: form.kt.value.trim(),
-      phone: form.phone.value.trim(),
-      complaint: form.complaint.value,
-      notes: form.notes.value.trim(),
-      redFlags: Array.from([$('#rf1'),$('#rf2'),$('#rf3')]).filter(i=>i.checked).map(i=>i.value)
-    };
-    const res = await api('tickets-create', {
+  const fd = new FormData(F);
+  const payload = Object.fromEntries(fd.entries());
+  if(payload.phone){ payload.phone = payload.phone.replace(/\D+/g,'').slice(-7); }
+  try{
+    const res = await fetch(CREATE_URL, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(data)
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(payload)
     });
-    const out = await res.json().catch(()=>({ok:false}));
-    if(out.ok && out.id){
-      location.href = `/patient/ticket.html?id=${encodeURIComponent(out.id)}`;
-    }else{
-      throw new Error(out.error||'Failed to create ticket');
+    const data = await res.json().catch(()=>({}));
+    if(data && data.id){ sessionStorage.setItem('lastTicketId', data.id); }
+    if(!res.ok || !data || !data.id){
+      alert('Sorry, we could not create your ticket. Please try again.');
+      console.warn('Create response', data);
+      return;
     }
-  } catch(err){
-    msg.textContent = 'Sorry, we could not create your ticket. Please try again.';
-  } finally {
-    btn.disabled = false;
+    location.href = `/patient/ticket.html?id=${encodeURIComponent(data.id)}`;
+  }catch(err){
+    console.error(err);
+    alert('Network error. Please try again.');
   }
 });
 </script>
