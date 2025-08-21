@@ -1,27 +1,3 @@
+
 [functions]
-directory = "netlify/functions"
-node_bundler = "esbuild"
-
-[[redirects]]
-from = "/api/tickets-create"
-to = "/.netlify/functions/tickets-create"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/tickets-list"
-to = "/.netlify/functions/tickets-list"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/tickets-get"
-to = "/.netlify/functions/tickets-get"
-status = 200
-force = true
-
-[[redirects]]
-from = "/.well-known/health"
-to = "/.netlify/functions/env-check"
-status = 200
-force = true
+  node_bundler = "esbuild"
