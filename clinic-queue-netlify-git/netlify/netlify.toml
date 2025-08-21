@@ -1,3 +1,11 @@
+# clinic-queue-netlify-git/netlify.toml
 
-[functions]
-  node_bundler = "esbuild"
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Map /api/* to your serverless functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
