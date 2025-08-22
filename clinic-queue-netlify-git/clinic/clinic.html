@@ -6,142 +6,141 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Clinic queue</title>
   <style>
-    :root{
-      --bg:#f7f8fb;
-      --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --border:#e2e8f0;
-      --ok:#16a34a;
-      --ok-bg:#e9f9ee;
-      --warn:#3b82f6;
-      --warn-bg:#eaf2ff;
-      --danger:#ef4444;
-      --danger-bg:#ffecec;
-    }
-    html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI",
-      Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
-    .wrap{max-width:1100px;margin:24px auto;padding:0 16px;}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+    :root { --bg:#f7f9fc; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb; --ok:#16a34a; --info:#3b82f6; --danger:#ef4444; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+    .wrap{max-width:1100px;margin:32px auto;padding:0 16px;}
+    h1{font-size:22px;font-weight:700;margin:0 0 16px;}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.04);overflow:hidden;border:1px solid var(--line);}
     table{width:100%;border-collapse:separate;border-spacing:0;}
-    thead th{background:var(--bg);font-weight:600;color:var(--muted);text-align:left;padding:12px 16px;border-bottom:1px solid var(--border);}
-    td{padding:16px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
-    /* keep a continuous separator line under Actions as requested */
-    tr:first-child td{border-top:0;}
-    tr td:first-child{border-left:1px solid var(--border);}
-    tr td:last-child{border-right:1px solid var(--border);}
-    .num{width:36px;color:var(--muted);}
-    .patient .name{font-weight:600;}
-    .patient .id{margin-top:6px;color:var(--muted);font-size:12px;background:#f1f5f9;border:1px solid var(--border);padding:4px 8px;border-radius:999px;display:inline-block;}
-    .badge{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:600;font-size:12px;}
-    .badge.ok{color:var(--ok);background:var(--ok-bg);border:1px solid #bfeacb;}
-    .badge.notified{color:var(--warn);background:var(--warn-bg);border:1px solid #c9dbff;}
-    .btn{appearance:none;border:1px solid var(--border);background:#f8fafc;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
-    .btn:disabled{opacity:.6;cursor:default}
-    .btn.notify{color:white;background:#3b82f6;border-color:#3b82f6;}
-    .btn.notified{color:#334155;background:#e2e8f0;border-color:#e2e8f0;cursor:default;}
-    .btn.delete{color:#ef4444;background:#ffecec;border-color:#ffc7c7;}
-    .row{background:#fff}
-    .actions{white-space:nowrap;display:flex;gap:10px}
-    @media (max-width:720px){
-      thead{display:none}
-      tr{display:block;border:1px solid var(--border);border-radius:14px;margin:10px 0}
-      td{display:block;border:none;border-bottom:1px solid var(--border)}
-      td:last-child{border-bottom:0}
-      .actions{justify-content:flex-end}
-    }
+    thead th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);background:#fbfdff;}
+    tbody td{padding:16px;border-bottom:1px solid var(--line);vertical-align:middle;}
+    tbody tr:last-child td{border-bottom:0;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:var(--muted);font-size:12px}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:600}
+    .pill.ok{background:#e7f7ed;color:#0a7a2f;border:1px solid #bbebc7}
+    .pill.info{background:#e8f1ff;color:#1652c1;border:1px solid #c7dcff}
+    .pill.muted{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+    .btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    .btn:disabled{opacity:.55;cursor:default}
+    .btn-blue{background:#5b82f6;color:#fff}
+    .btn-red{background:#fee2e2;color:#991b1b}
+    .row-title{font-weight:700}
+    .sub{color:var(--muted);font-size:12px;margin-top:4px}
+    .num{width:48px;text-align:right;padding-right:8px}
+    .status-col{width:140px}
+    .actions-col{width:220px}
   </style>
 </head>
 <body>
   <div class="wrap">
+    <h1>Queue</h1>
     <div class="card">
       <table id="queue">
         <thead>
           <tr>
             <th class="num">#</th>
-            <th>Patient</th>
+            <th>Name</th>
             <th>Primary complaint</th>
             <th>Created</th>
-            <th>Status</th>
-            <th>Actions</th>
+            <th class="status-col">Status</th>
+            <th class="actions-col">Actions</th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <!-- rows injected -->
+          <tr><td colspan="6" class="mono">Loading…</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
   <script>
-    const fmt = (iso)=>{
-      try{
+    const TBody = document.getElementById('tbody');
+
+    function fmtDate(iso) {
+      try {
         const d = new Date(iso);
-        return d.toLocaleDateString(undefined,{day:'2-digit',month:'2-digit',year:'numeric'})+', '+
-               d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
-      }catch(e){ return iso; }
-    };
-
-    function escapeHTML(str){
-      return (str??'').toString().replace(/[&<>"']/g,s=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[s]));
+        return d.toLocaleString([], { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      } catch { return iso || ''; }
     }
 
-    async function load(){
-      const res = await fetch('/api/tickets-list',{headers:{'cache-control':'no-cache'}});
-      const data = await res.json();
-      if(!data.ok){ console.error('list error',data); return; }
-      const items = data.items || [];
-      items.sort((a,b)=>(a.position||999)-(b.position||999));
-      const tbody = document.getElementById('tbody');
-      tbody.innerHTML = items.map((t,i)=>{
-        const id = escapeHTML(t.id);
-        const name = escapeHTML(t.name||'—');
-        const c = escapeHTML(t.complaint||'—');
-        const created = fmt(t.createdAt);
-        const statusBadge = t.status==='called'
-          ? '<span class="badge ok">Called</span>'
-          : (t.notifiedAt ? '<span class="badge notified">Notified</span>' : '<span class="badge">Waiting</span>');
-        const notifiedClass = t.notifiedAt ? 'btn notified' : 'btn notify';
-        const notifiedLabel = t.notifiedAt ? 'Notified' : 'Notify';
-        return `
-          <tr class="row">
-            <td class="num">${(t.position ?? (i+1))}</td>
-            <td class="patient">
-              <div class="name">${name}</div>
-              <div class="id">ID: <span>${id}</span></div>
-            </td>
-            <td>${c}</td>
-            <td>${created}</td>
-            <td>${statusBadge}</td>
-            <td class="actions">
-              <button class="${notifiedClass}" data-action="notify" data-id="${id}" ${t.notifiedAt?'disabled':''}>${notifiedLabel}</button>
-              <button class="btn delete" data-action="delete" data-id="${id}">Delete</button>
-            </td>
-          </tr>`;
-      }).join('');
-    }
-
-    async function api(path, opts={}){
-      const res = await fetch(path, Object.assign({headers:{'content-type':'application/json'}}, opts));
-      return res.json();
-    }
-
-    document.addEventListener('click', async (e)=>{
-      const btn = e.target.closest('button[data-action]'); if(!btn) return;
-      const id = btn.getAttribute('data-id'); const act = btn.getAttribute('data-action');
-      if(act==='notify'){
-        const r = await api('/api/tickets-notify?id='+encodeURIComponent(id), {method:'POST'});
-        if(r.ok){ btn.textContent='Notified'; btn.className='btn notified'; btn.disabled=true; load(); }
-        else alert('Failed to notify: '+JSON.stringify(r));
-      }else if(act==='delete'){
-        if(!confirm('Remove this patient from the queue?')) return;
-        const r = await api('/api/tickets-delete?id='+encodeURIComponent(id), {method:'POST'});
-        if(r.ok){ load(); } else alert('Failed to delete: '+JSON.stringify(r));
+    async function fetchList() {
+      const res = await fetch('/api/tickets-list', { cache:'no-store' });
+      const json = await res.json();
+      if (!json.ok) {
+        TBody.innerHTML = `<tr><td colspan="6" class="mono">Failed to load: ${json.error||'unknown'}</td></tr>`;
+        return;
       }
-    });
+      render(json.items || []);
+    }
 
-    load();
-    setInterval(load, 8000);
+    function rowHtml(item) {
+      const position = (item.position ?? 0) || 0;
+      const status = (item.status || 'waiting');
+      const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+      const statusClass = status === 'called' ? 'ok' : (status === 'notified' ? 'info' : 'muted');
+      const notified = status === 'notified' || status === 'called';
+
+      return `
+        <tr data-id="${item.id}">
+          <td class="num">${position || ''}</td>
+          <td>
+            <div class="row-title">${(item.name || '').replace(/</g,'&lt;')}</div>
+            <div class="sub mono">ID: ${item.id}</div>
+          </td>
+          <td>${(item.complaint || '').replace(/</g,'&lt;')}</td>
+          <td>${fmtDate(item.createdAt)}</td>
+          <td><span class="pill ${statusClass}">${statusLabel}</span></td>
+          <td>
+            <button class="btn btn-blue" data-act="notify" ${notified ? 'disabled':''}>${notified ? 'Notified':'Notify'}</button>
+            <button class="btn btn-red" data-act="delete">Delete</button>
+          </td>
+        </tr>
+      `;
+    }
+
+    function render(items) {
+      if (!items.length) {
+        TBody.innerHTML = `<tr><td colspan="6" class="mono">No patients in queue.</td></tr>`;
+        return;
+      }
+      TBody.innerHTML = items.map(rowHtml).join('');
+    }
+
+    async function handleClick(e) {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const tr = btn.closest('tr');
+      const id = tr?.dataset.id;
+      if (!id) return;
+
+      const act = btn.dataset.act;
+      try {
+        if (act === 'notify') {
+          const r = await fetch('/api/tickets-notify?id=' + encodeURIComponent(id), { method:'POST' });
+          const j = await r.json();
+          if (!j.ok) return alert('Failed to notify: ' + (j.error || 'unknown'));
+          // mutate button + status inline (avoid collapsing rows)
+          btn.textContent = 'Notified';
+          btn.disabled = true;
+          const statusPill = tr.querySelector('.pill');
+          if (statusPill) { statusPill.textContent = 'Notified'; statusPill.className = 'pill info'; }
+        } else if (act === 'delete') {
+          if (!confirm('Remove this patient from the queue?')) return;
+          const r = await fetch('/api/tickets-delete?id=' + encodeURIComponent(id), { method:'DELETE' });
+          const j = await r.json();
+          if (!j.ok) return alert('Failed to delete: ' + (j.error || 'unknown'));
+          tr.remove();
+          if (!TBody.children.length) fetchList();
+        }
+      } catch (err) {
+        alert('Action failed: ' + err.message);
+      }
+    }
+    TBody.addEventListener('click', handleClick);
+
+    fetchList();
+    // keep the page fresh but do not collapse rows because we modify inline
+    setInterval(fetchList, 15000);
   </script>
 </body>
 </html>
