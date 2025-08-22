@@ -1,0 +1,7 @@
+
+/* Minimal, non-invasive fix: draw the horizontal separator across ALL cells in each row.
+   Drop this file into your clinic page or link it with <link rel="stylesheet" href="/snippets/row-divider.css">.
+   It does NOT change fonts, sizing, or colors beyond the subtle divider. */
+tbody tr:not(:last-child) > * {
+  border-bottom: 1px solid var(--divider, rgba(0,0,0,.10));
+}

@@ -1,0 +1,12 @@
+/* Optional: style for the green 'called' callout box on the ticket page */
+#called-box {
+  display: block;
+  padding: 12px 14px;
+  margin: 12px 0;
+  border-radius: 10px;
+  font-weight: 600;
+  background: #e6f7ec;
+  color: #0f5132;
+  border: 1px solid #b8e1c8;
+}
+#called-box[hidden] { display: none; }
