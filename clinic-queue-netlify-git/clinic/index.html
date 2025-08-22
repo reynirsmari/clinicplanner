@@ -1,190 +1,162 @@
+
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clinic queue</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Clinic Queue</title>
   <style>
-    :root{--bg:#f7f8fb;--panel:#ffffff;--text:#0f172a;--sub:#475569;--accent:#2563eb;--accent-2:#22c55e;--danger:#ef4444;--muted:#e2e8f0;}
+    :root{--bg:#f6f7fb;--card:#fff;--text:#0f172a;--muted:#475569;--border:#e5e7eb;--accent:#0ea5e9;--good:#16a34a;--warn:#f59e0b;}
     *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
-    header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--muted);z-index:10}
-    header .wrap{max-width:1100px;margin:auto;padding:16px 20px;display:flex;gap:12px;align-items:center;justify-content:space-between}
-    h1{font-size:20px;margin:0}
-    main{max-width:1100px;margin:24px auto;padding:0 20px}
-    .card{background:var(--panel);border:1px solid var(--muted);border-radius:14px;overflow:hidden;box-shadow:0 10px 20px rgba(2,6,23,.04)}
-    table{width:100%;border-collapse:collapse}
-    thead th{font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);background:var(--bg);}
-    th,td{padding:14px 16px;border-bottom:1px solid var(--muted);vertical-align:top}
-    tbody tr.details td{background:#fbfdff}
-    .badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;font-size:12px;border:1px solid var(--muted);color:var(--sub);}
-    .pos{font-weight:700}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}
-    button{appearance:none;border:1px solid var(--muted);background:#fff;color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
-    button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-    button.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
-    button[disabled]{opacity:.6;cursor:not-allowed}
-    .row{cursor:pointer}
-    .row:hover td{background:#f6faff}
-    .empty{padding:40px;text-align:center;color:var(--sub)}
-    .name{font-weight:600}
-    .nowrap{white-space:nowrap}
-    @media (max-width: 800px){
-      .hide-sm{display:none}
-      th,td{padding:12px}
-      header .wrap{padding:12px 16px}
-    }
-  </style>
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+    h1{margin:8px 0 16px;font-weight:800;letter-spacing:-.02em}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:12px}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    th,td{padding:12px;vertical-align:top}
+    th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:12px}
+    tr.row{background:#fff}
+    tr.row td:first-child{border-left:1px solid var(--border);border-top-left-radius:12px;border-bottom-left-radius:12px}
+    tr.row td:last-child{border-right:1px solid var(--border);border-top-right-radius:12px;border-bottom-right-radius:12px}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef6ff;color:#075985;font-weight:700;font-size:12px}
+    .actions button{border:0;border-radius:10px;padding:8px 10px;margin-right:8px;cursor:pointer}
+    .actions .notify{background:rgba(22,163,74,.12);color:#065f46}
+    .actions .delete{background:rgba(239,68,68,.1);color:#7f1d1d}
+    .muted{color:var(--muted)}
+    details{background:#fafafa;border:1px dashed var(--border);padding:10px;border-radius:10px}
+  
+    tr.row td{border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+</style>
 </head>
 <body>
-  <header>
-    <div class="wrap">
-      <h1>Clinic queue</h1>
-      <div id="counts" class="badge">–</div>
-    </div>
-  </header>
-
-  <main>
+  <div class="wrap">
+    <h1>Queue</h1>
     <div class="card">
       <table>
         <thead>
           <tr>
-            <th class="nowrap">#</th>
-            <th>Patient</th>
+            <th style="width:60px">#</th>
             <th>Primary complaint</th>
-            <th class="hide-sm">Created</th>
-            <th>Status</th>
-            <th>Actions</th>
+            <th style="width:180px">Created</th>
+            <th style="width:220px">Actions</th>
           </tr>
         </thead>
-        <tbody id="tbody">
-          <tr><td colspan="6" class="empty">Loading…</td></tr>
-        </tbody>
+        <tbody id="rows"></tbody>
       </table>
     </div>
-  </main>
+  </div>
+  <script>
+    const rowsEl = document.getElementById('rows');
+    const EXPANDED_KEY = 'clinic_expanded_ids';
 
-  <script type="module">
-    const tbody = document.getElementById('tbody');
-    const countsEl = document.getElementById('counts');
-
-    const expanded = new Set(JSON.parse(localStorage.getItem('clinic_expanded')||'[]'));
-    function persistExpanded(){ localStorage.setItem('clinic_expanded', JSON.stringify([...expanded])); }
-
-    async function api(path, opts={}){
-      const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, ...opts});
-      let data;
-      try{ data = await r.json(); } catch(e){ data = {ok:false, error:'Invalid JSON'}; }
-      if(!data.ok) throw new Error(data.error || 'Request failed');
-      return data;
+    function getExpandedSet() {
+      try { return new Set(JSON.parse(sessionStorage.getItem(EXPANDED_KEY) || '[]')); }
+      catch { return new Set(); }
+    }
+    function setExpandedSet(s) {
+      sessionStorage.setItem(EXPANDED_KEY, JSON.stringify([...s]));
     }
 
-    async function load(){
-      try{
-        const r = await fetch('/api/tickets-list', {cache:'no-store'});
-        const j = await r.json();
-        if(!j.ok) throw new Error(j.error || 'List failed');
-        render(j.items || []);
-      }catch(err){
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">Failed to load queue: '+err.message+'</td></tr>';
-        console.error(err);
-      }
+    async function fetchList() {
+      const res = await fetch('/api/tickets-list');
+      if (!res.ok) return { items: [] };
+      return res.json();
+    }
+    async function notify(id) {
+      const res = await fetch('/api/tickets-notify?id='+encodeURIComponent(id), { method:'POST' });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) alert('Failed to notify: ' + JSON.stringify(data));
+      render();
+    }
+    async function removeTicket(id) {
+      const res = await fetch('/api/tickets-delete?id='+encodeURIComponent(id), { method:'DELETE' });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) alert('Failed to delete: ' + JSON.stringify(data));
+      render();
     }
 
-    function fmtTime(iso){
-      try{
-        const d = new Date(iso);
-        return d.toLocaleString([], {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'});
-      }catch{ return iso; }
+    function fmt(ts) {
+      try { return new Date(ts).toLocaleString(); } catch { return ts; }
     }
 
-    function render(items){
-      if(!Array.isArray(items) || items.length===0){
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No patients in queue.</td></tr>';
-        countsEl.textContent = '0 waiting';
-        return;
-      }
+    async function render() {
+      const expanded = getExpandedSet();
+      const list = await fetchList();
+      const waiting = (list.items||[]).filter(x => x.status === 'waiting')
+        .sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+      const others = (list.items||[]).filter(x => x.status !== 'waiting')
+        .sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
 
-      // keep numeric order by position (existing API already provides)
-      items.sort((a,b)=>(a.position||999)-(b.position||999));
+      const all = [...waiting, ...others];
+      rowsEl.innerHTML = '';
 
-      const waiting = items.filter(i=>i.status!=='done' && i.status!=='removed');
-      countsEl.textContent = waiting.length + ' in queue';
+      const indexMap = new Map(waiting.map((t,idx)=>[t.id, idx+1]));
 
-      const rows = [];
-      for(const t of items){
-        const id = t.id;
-        const notified = !!t.notifiedAt;
-        const isExpanded = expanded.has(id);
+      for (const t of all) {
+        const tr = document.createElement('tr');
+        tr.className = 'row';
 
-        rows.push(`
-          <tr class="row" data-id="${id}" onclick="window._toggle('${id}')">
-            <td class="pos">${t.position ?? '–'}</td>
-            <td><div class="name">${escapeHtml(t.name||'—')}</div>
-                <div class="badge hide-sm">ID: ${id}</div></td>
-            <td>${escapeHtml(t.complaint || '—')}</td>
-            <td class="hide-sm">${fmtTime(t.createdAt)}</td>
-            <td>${t.status==='called' ? '<span class="badge" style="border-color: var(--accent-2); color: var(--accent-2)">Called</span>' : '<span class="badge">Waiting</span>'}</td>
-            <td class="actions" onclick="event.stopPropagation()">
-              <button class="primary" data-action="notify" data-id="${id}" ${notified ? 'disabled':''}>${notified ? 'Notified' : 'Notify'}</button>
-              <button class="danger" data-action="delete" data-id="${id}">Delete</button>
-            </td>
-          </tr>
-          <tr class="details" id="det-${id}" style="display:${isExpanded?'table-row':'none'}">
-            <td></td>
-            <td colspan="5">
-              <div class="hide-sm"><strong>KT:</strong> ${escapeHtml(t.kt||'—')} &nbsp;&nbsp; <strong>Phone:</strong> ${escapeHtml(t.phone||'—')}</div>
-              <div><strong>Notes:</strong> ${escapeHtml(t.notes||'')}</div>
-              ${Array.isArray(t.redFlags)&&t.redFlags.length ? `<div><strong>Red flags:</strong> ${t.redFlags.map(escapeHtml).join(', ')}</div>`:''}
-            </td>
-          </tr>
-        `);
-      }
-      tbody.innerHTML = rows.join('');
+        const number = indexMap.get(t.id);
+        const numTd = document.createElement('td');
+        numTd.innerHTML = number ? `<span class="pill">#${number}</span>` : `<span class="muted">—</span>`;
 
-      // attach listeners
-      tbody.querySelectorAll('button[data-action="delete"]').forEach(btn=>{
-        btn.addEventListener('click', async (e)=>{
-          const id = btn.getAttribute('data-id');
-          try{
-            await api('/api/tickets-delete?id='+encodeURIComponent(id));
-            await load();
-          }catch(err){
-            alert('Failed to delete: '+err.message);
-          }
+        const primaryTd = document.createElement('td');
+        primaryTd.textContent = t.complaint || t.primary || '—';
+
+        const createdTd = document.createElement('td');
+        createdTd.textContent = fmt(t.createdAt);
+
+        const actionsTd = document.createElement('td');
+        actionsTd.className='actions';
+        actionsTd.innerHTML = `
+          <button class="notify">Notify</button>
+          <button class="delete">Delete</button>
+          <div class="muted" style="margin-top:6px">ID: ${t.id}</div>
+        `;
+
+        const row = document.createElement('tr');
+        row.append(numTd, primaryTd, createdTd, actionsTd);
+
+        // Expandable details row
+        const detTr = document.createElement('tr');
+        const detTd = document.createElement('td');
+        detTd.colSpan = 4;
+        detTd.innerHTML = `
+          <details ${expanded.has(t.id)?'open':''}>
+            <summary>Details</summary>
+            <div style="margin-top:8px">
+              <div><strong>Name:</strong> ${t.name||'—'}</div>
+              <div><strong>KT:</strong> ${t.kt||'—'}</div>
+              <div><strong>Phone:</strong> ${t.phone||'—'}</div>
+              <div><strong>Notes:</strong> ${t.notes||'—'}</div>
+              <div><strong>Status:</strong> ${t.status}</div>
+            </div>
+          </details>
+        `;
+        detTr.appendChild(detTd);
+
+        // action bindings
+        actionsTd.querySelector('.notify').onclick = ()=>notify(t.id);
+        actionsTd.querySelector('.delete').onclick = ()=>removeTicket(t.id);
+
+        // persist expanded toggles
+        detTd.querySelector('details').addEventListener('toggle', (ev)=>{
+          const set = getExpandedSet();
+          if (ev.target.open) set.add(t.id); else set.delete(t.id);
+          setExpandedSet(set);
         });
-      });
-      tbody.querySelectorAll('button[data-action="notify"]').forEach(btn=>{
-        btn.addEventListener('click', async (e)=>{
-          const id = btn.getAttribute('data-id');
-          try{
-            await api('/api/tickets-notify?id='+encodeURIComponent(id));
-            btn.textContent = 'Notified';
-            btn.setAttribute('disabled','');
-          }catch(err){
-            alert('Failed to notify: '+err.message);
-          }
-        });
-      });
+
+        rowsEl.append(row);
+        rowsEl.append(detTr);
+      }
     }
 
-    // util: toggle details (called from row onclick)
-    window._toggle = (id)=>{
-      const tr = document.getElementById('det-'+id);
-      if(!tr) return;
-      const show = tr.style.display === 'none';
-      tr.style.display = show ? 'table-row' : 'none';
-      if(show) expanded.add(id); else expanded.delete(id);
-      persistExpanded();
-    }
-
-    function escapeHtml(s){
-      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m]));
-    }
-
-    // poll
-    load();
-    setInterval(load, 5000);
+    render();
+    setInterval(render, 8000);
   </script>
+
+  <script src="/snippets/clinic-actions.js"></script>
+
 </body>
+  
 </html>
