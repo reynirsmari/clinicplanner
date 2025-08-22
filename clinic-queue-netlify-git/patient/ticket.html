@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,39 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Your ticket</title>
   <style>
-    :root{
-      --bg:#f7f8fb;--card:#fff;--text:#121826;--muted:#6b7280;--good:#16a34a;--border:#e5e7eb;--accent:#0ea5e9;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    :root{--bg:#f7f8fb;--card:#fff;--text:#121826;--muted:#6b7280;--good:#16a34a;--border:#e5e7eb;--accent:#0ea5e9;}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     .wrap{max-width:760px;margin:24px auto;padding:0 16px}
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:24px}
     h1{margin:0 0 6px;font-weight:800;letter-spacing:-.02em}
-    p.lead{margin:0 0 16px;color:var(--muted)}
-    .pill{display:inline-block;background:#eef6ff;color:#0369a1;border-radius:999px;padding:8px 12px;font-weight:700}
-    .notice{margin-top:10px;border-left:4px solid var(--accent);padding:8px 12px;background:#eef6ff;color:#075985;border-radius:8px}
-    .ok{background:#ecfdf5;color:#065f46;border-left-color:var(--good)}
+    .muted{color:var(--muted)}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#eef6ff;color:#075985;font-weight:700;font-size:12px}
+    .good{background:#ecfdf5;color:#065f46}
+    .notice{margin-top:12px;padding:10px;border:1px dashed var(--accent);border-radius:12px;background:#f0f9ff}
+    .kv{display:grid;gap:8px 12px;grid-template-columns:140px 1fr}
+    .kv div{display:flex;gap:8px}
+    @media(max-width:640px){.kv{grid-template-columns:1fr} .wrap{padding:0 12px}}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Your ticket</h1>
-      <p class="lead">Keep this page open. We’ll update your status automatically.</p>
-      <div id="statusRow">
-        <span id="queuePill" class="pill">Loading position…</span>
-        <div id="advice" class="notice" style="display:none"></div>
-        <div id="notify" class="notice ok" style="display:none">It’s your turn. Please proceed to the reception desk.</div>
+      <p class="muted">Keep this page open — your status updates automatically.</p>
+      <div class="pill" id="queuePill">Loading…</div>
+      <div id="notify" class="notice" style="display:none">You’re being called. Please proceed to the reception desk now.</div>
+      <div class="kv" style="margin-top:12px">
+        <div>Ticket</div><div id="tid">—</div>
+        <div>Complaint</div><div id="complaint">—</div>
       </div>
+      <div id="advice" class="notice" style="display:none"></div>
     </div>
   </div>
   <script>
     const params = new URLSearchParams(location.search);
     const ticketId = params.get('id');
-
     const pill = document.getElementById('queuePill');
     const advice = document.getElementById('advice');
     const notifyBox = document.getElementById('notify');
+    const tid = document.getElementById('tid');
+    const complaint = document.getElementById('complaint');
 
     async function getPosition() {
       try {
@@ -46,33 +48,46 @@
           fetch('/api/tickets-list'),
           fetch('/api/tickets-get?id=' + encodeURIComponent(ticketId))
         ]);
-        const list = await listRes.json().catch(()=>({items:[]}));
-        const ticket = await getRes.json().catch(()=>null);
+        const listWrap = await listRes.json().catch(()=>({items:[]}));
+        const getWrap = await getRes.json().catch(()=>null);
 
-        if (getRes.status === 404 || !ticket) {
+        if (getRes.status === 404 || !getWrap) {
           pill.textContent = 'Ticket not found';
           return;
         }
 
-        const waiting = (list.items || []).filter(x => x.status === 'waiting')
+        // Support both response shapes: {ticket:{...}} or raw {...}
+        const t = getWrap.ticket || getWrap;
+        tid.textContent = t.id || '—';
+        complaint.textContent = t.complaint || '—';
+
+        const waiting = (listWrap.items || [])
+          .filter(x => x.status === 'waiting')
           .sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+
         const pos = waiting.findIndex(x => x.id === ticketId);
         if (pos >= 0) {
           const spot = pos + 1;
           pill.textContent = `You are #${spot} in line`;
-          advice.style.display = spot <= 4 ? 'block' : 'none';
-          advice.textContent = 'You are approaching the front of the line. Please ensure you are in the waiting area so we can call you promptly.';
+          if (spot <= 4) {
+            advice.style.display = 'block';
+            advice.textContent = 'You are approaching the front of the queue. Please ensure you are in the waiting area so we can call you promptly.';
+          } else {
+            advice.style.display = 'none';
+          }
+          notifyBox.style.display = 'none';
         } else {
-          // Not waiting anymore; check status for "called" or removed
-          if (ticket.status === 'called') {
+          // Not in waiting list anymore: check for "called"
+          if (t.status === 'called') {
             notifyBox.style.display = 'block';
             pill.textContent = 'Please proceed to reception';
           } else {
             pill.textContent = 'Ticket not found';
+            notifyBox.style.display = 'none';
           }
         }
       } catch (e) {
-        // swallow
+        // ignore
       }
     }
 
