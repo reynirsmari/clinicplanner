@@ -1,102 +1,105 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Your ticket</title>
   <style>
-    :root{--bg:#f7f8fb;--card:#fff;--text:#121826;--muted:#6b7280;--good:#16a34a;--border:#e5e7eb;--accent:#0ea5e9;}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{max-width:760px;margin:24px auto;padding:0 16px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:24px}
-    h1{margin:0 0 6px;font-weight:800;letter-spacing:-.02em}
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --ink:#0f172a;
+      --muted:#5b6b82;
+      --divider:#e5eaf2;
+      --green:#34c759;
+      --green-bg:#e8f9ee;
+      --green-ink:#0f8a3c;
+      --radius:18px;
+      --shadow:0 6px 24px rgba(18, 38, 63, 0.06);
+    }
+    html,body{background:var(--bg); color:var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Helvetica Neue", Arial; margin:0}
+    .wrap{max-width:900px; margin:32px auto; padding:0 16px}
+    .card{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:28px}
+    h1{font-size:34px; margin:0 0 12px}
+    .lead{color:var(--muted); margin-bottom:24px}
+    .row{display:flex; gap:18px; align-items:center; flex-wrap:wrap}
+    .badge{display:inline-flex; align-items:center; justify-content:center; min-width:64px; height:64px; border-radius:14px; background:#eef2ff; color:#1e2a78; font-weight:800; font-size:28px; padding:0 18px}
     .muted{color:var(--muted)}
-    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#eef6ff;color:#075985;font-weight:700;font-size:12px}
-    .good{background:#ecfdf5;color:#065f46}
-    .notice{margin-top:12px;padding:10px;border:1px dashed var(--accent);border-radius:12px;background:#f0f9ff}
-    .kv{display:grid;gap:8px 12px;grid-template-columns:140px 1fr}
-    .kv div{display:flex;gap:8px}
-    @media(max-width:640px){.kv{grid-template-columns:1fr} .wrap{padding:0 12px}}
+    .callout{margin-top:18px; padding:16px 18px; border-radius:14px; background:var(--green-bg); border:2px solid var(--green); color:var(--green-ink); font-weight:800; font-size:18px}
+    .section{margin-top:18px}
+    .grid{display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px}
+    .field{padding:14px; border:1px solid var(--divider); border-radius:14px}
+    @media (max-width:740px){ .grid{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Your ticket</h1>
-      <p class="muted">Keep this page open — your status updates automatically.</p>
-      <div class="pill" id="queuePill">Loading…</div>
-      <div id="notify" class="notice" style="display:none">You’re being called. Please proceed to the reception desk now.</div>
-      <div class="kv" style="margin-top:12px">
-        <div>Ticket</div><div id="tid">—</div>
-        <div>Complaint</div><div id="complaint">—</div>
+      <p class="lead">Keep this page open. We’ll update your status automatically.</p>
+
+      <div class="row">
+        <div class="badge" id="pos">—</div>
+        <div>
+          <div class="muted">Position in queue</div>
+          <div id="status" style="margin-top:6px; font-weight:700">—</div>
+        </div>
       </div>
-      <div id="advice" class="notice" style="display:none"></div>
+
+      <div id="callout" class="callout" style="display:none"></div>
+
+      <div class="section">
+        <div class="grid">
+          <div class="field"><strong>Name:</strong> <span id="name">—</span></div>
+          <div class="field"><strong>Primary complaint:</strong> <span id="complaint">—</span></div>
+          <div class="field"><strong>Reference:</strong> <span id="tid">—</span></div>
+          <div class="field"><strong>Created:</strong> <span id="created">—</span></div>
+        </div>
+      </div>
     </div>
   </div>
-  <script>
-    const params = new URLSearchParams(location.search);
-    const ticketId = params.get('id');
-    const pill = document.getElementById('queuePill');
-    const advice = document.getElementById('advice');
-    const notifyBox = document.getElementById('notify');
-    const tid = document.getElementById('tid');
-    const complaint = document.getElementById('complaint');
 
-    async function getPosition() {
-      try {
-        const [listRes, getRes] = await Promise.all([
-          fetch('/api/tickets-list'),
-          fetch('/api/tickets-get?id=' + encodeURIComponent(ticketId))
-        ]);
-        const listWrap = await listRes.json().catch(()=>({items:[]}));
-        const getWrap = await getRes.json().catch(()=>null);
+<script>
+const qs = new URLSearchParams(location.search);
+const id = qs.get('id');
 
-        if (getRes.status === 404 || !getWrap) {
-          pill.textContent = 'Ticket not found';
-          return;
-        }
+function fmt(ts){
+  try{ return new Intl.DateTimeFormat(undefined,{day:'2-digit',month:'2-digit',year:'numeric', hour:'2-digit', minute:'2-digit'}).format(new Date(ts)); }
+  catch{ return ts; }
+}
 
-        // Support both response shapes: {ticket:{...}} or raw {...}
-        const t = getWrap.ticket || getWrap;
-        tid.textContent = t.id || '—';
-        complaint.textContent = t.complaint || '—';
+async function load(){
+  if(!id){
+    document.getElementById('status').textContent = 'Missing ticket id.';
+    return;
+  }
+  const r = await fetch('/api/tickets-get?id='+encodeURIComponent(id));
+  const j = await r.json();
+  if(!j.ok || !j.item){
+    document.getElementById('status').textContent = 'Ticket not found.';
+    document.getElementById('pos').textContent = '—';
+    document.getElementById('callout').style.display = 'none';
+    return;
+  }
+  const t = j.item;
+  document.getElementById('tid').textContent = t.id;
+  document.getElementById('name').textContent = t.name || '—';
+  document.getElementById('complaint').textContent = t.complaint || '—';
+  document.getElementById('created').textContent = fmt(t.createdAt);
+  document.getElementById('pos').textContent = t.position ?? '—';
+  document.getElementById('status').textContent = t.status === 'called' ? 'Called' : 'Waiting';
+  // Prominent green callout when notified/called
+  const call = document.getElementById('callout');
+  if(t.status === 'called' || t.notifiedAt){
+    call.style.display = 'block';
+    call.textContent = "It's your turn now. Please proceed to the reception desk immediately.";
+  }else{
+    call.style.display = 'none';
+  }
+}
 
-        const waiting = (listWrap.items || [])
-          .filter(x => x.status === 'waiting')
-          .sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
-
-        const pos = waiting.findIndex(x => x.id === ticketId);
-        if (pos >= 0) {
-          const spot = pos + 1;
-          pill.textContent = `You are #${spot} in line`;
-          if (spot <= 4) {
-            advice.style.display = 'block';
-            advice.textContent = 'You are approaching the front of the queue. Please ensure you are in the waiting area so we can call you promptly.';
-          } else {
-            advice.style.display = 'none';
-          }
-          notifyBox.style.display = 'none';
-        } else {
-          // Not in waiting list anymore: check for "called"
-          if (t.status === 'called') {
-            notifyBox.style.display = 'block';
-            pill.textContent = 'Please proceed to reception';
-          } else {
-            pill.textContent = 'Ticket not found';
-            notifyBox.style.display = 'none';
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    if (!ticketId) {
-      pill.textContent = 'Missing ticket id';
-    } else {
-      getPosition();
-      setInterval(getPosition, 8000);
-    }
-  </script>
+load();
+setInterval(load, 5000);
+</script>
 </body>
 </html>
