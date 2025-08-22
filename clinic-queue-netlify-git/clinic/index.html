@@ -5,40 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Clinic queue</title>
   <link rel="stylesheet" href="/styles.css">
-  <script defer src="/snippets/clinic-actions.js"></script>
   <style>
     .action[disabled]{opacity:.55;cursor:not-allowed;background:#f3f4f6 !important;color:#9ca3af !important;border-color:#e5e7eb !important}
     .muted{color:#6b7280}
     .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#eef2ff;color:#1f2937;margin-left:6px}
     .badge.called{background:#ecfdf5;color:#065f46}
+    .debug{display:none;white-space:pre-wrap;background:#0b1020;color:#cbd5e1;padding:12px;border-radius:8px;margin-top:12px}
+    .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .table{width:100%;border-collapse:separate;border-spacing:0 10px}
+    .table th{font-size:12px;color:#6b7280;text-align:left;padding:0 12px}
+    .table td{background:#fff;padding:14px 12px}
   </style>
 </head>
 <body>
   <main class="container">
     <div class="panel">
-      <div class="row-head">
+      <div class="toolbar">
         <h1>Queue</h1>
         <span class="small" id="updated"></span>
       </div>
       <div id="empty" class="muted" style="display:none;margin:8px 0 0">No patients in the queue.</div>
       <table class="table" id="table"></table>
+      <div id="debug" class="debug"></div>
     </div>
   </main>
+
   <script>
   const table = document.getElementById('table');
   const updated = document.getElementById('updated');
   const emptyBox = document.getElementById('empty');
+  const debugBox = document.getElementById('debug');
   const OPEN_KEY = 'clinic_open_rows';
   let open = new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || '[]'));
+  const qs = new URLSearchParams(location.search);
+  const DEBUG = qs.get('debug') === '1';
+
+  function logDebug(obj){
+    if(!DEBUG) return;
+    debugBox.style.display = 'block';
+    debugBox.textContent = (typeof obj === 'string') ? obj : JSON.stringify(obj, null, 2);
+  }
 
   function rowDetails(t){
     return \`
       <div class="kv">
         <div><span>Ticket:</span> \${t.id}</div>
-        <div><span>Name:</span> \${t.name || '—'}</div>
+        <div><span>Name:</span> \${t.name || t.fullName || '—'}</div>
         <div><span>Phone:</span> \${t.phone || '—'}</div>
         <div><span>ID:</span> \${t.kt || '—'}</div>
-        <div><span>Notes:</span> \${t.notes || '—'}</div>
+        <div><span>Notes:</span> \${(t.notes || '—').replace(/</g,'&lt;')}</div>
       </div>\`;
   }
 
@@ -49,6 +64,7 @@
       <th>#</th><th>Patient</th><th>Primary complaint</th><th>Created</th><th>ID</th><th>Actions</th>
     </tr>\`;
     table.appendChild(thead);
+
     const tbody = document.createElement('tbody');
 
     if (!Array.isArray(list) || list.length === 0){
@@ -62,18 +78,24 @@
     list.forEach((t, idx) => {
       const tr = document.createElement('tr');
       tr.dataset.id = t.id;
+
       const called = (t.status === 'called' || t.status === 'notified');
       const pos = t.position || (idx + 1);
+      const name = t.name || t.fullName || '—';
+      const complaint = t.complaint || t.primaryComplaint || '—';
+      const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
+
       const actions = \`
         <button class="action" data-act="toggle">Details</button>
         <button class="action" data-act="notify" data-id="\${t.id}" \${called ? 'disabled':''}>\${called ? 'Notified' : 'Notify'}</button>
         <button class="action" data-act="delete" data-id="\${t.id}">Delete</button>
       \`;
+
       tr.innerHTML = \`
         <td>#\${pos}</td>
-        <td>\${t.name || '—'}</td>
-        <td>\${t.complaint || '—'}\${called ? '<span class="badge called">called</span>':''}</td>
-        <td>\${new Date(t.createdAt || Date.now()).toLocaleString()}</td>
+        <td>\${name}</td>
+        <td>\${complaint}\${called ? '<span class="badge called">called</span>':''}</td>
+        <td>\${created}</td>
         <td style="font-family:ui-monospace,monospace">\${t.id}</td>
         <td>\${actions}</td>
       \`;
@@ -101,16 +123,27 @@
   }
 
   function pickListShape(data){
-    // Accepts {ok, items}, {items}, {tickets}, array, or any wrapper with .items/.tickets
+    // Accept many shapes: {ok, items}, {tickets}, array directly, etc.
     if (Array.isArray(data)) return data;
     if (!data || typeof data !== 'object') return [];
     return data.items || data.tickets || data.list || [];
+  }
+
+  async function api(url, body){
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body || {})
+    });
+    const data = await res.json().catch(()=>({ ok:false }));
+    return { ok: !!data.ok, data };
   }
 
   async function refresh(){
     try{
       const res = await fetch('/api/tickets-list');
       const data = await res.json().catch(()=>({}));
+      logDebug({ from:'/api/tickets-list', data });
       const list = pickListShape(data);
       draw(list);
       updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
@@ -118,10 +151,44 @@
       updated.textContent = 'Failed to load queue';
       table.innerHTML = '';
       emptyBox.style.display = 'block';
+      logDebug(String(e));
     }
   }
   refresh();
   setInterval(refresh, 5000);
+
+  document.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button.action');
+    if (!btn) return;
+    const row = btn.closest('tr');
+    const id = btn.dataset.id || (row ? row.dataset.id : null);
+    const act = btn.dataset.act;
+
+    if (act === 'notify'){
+      if (!id) return alert('Missing id');
+      btn.textContent = 'Notifying…'; btn.setAttribute('disabled','true');
+      const { ok, data } = await api('/api/tickets-notify?id='+encodeURIComponent(id));
+      if (!ok){ btn.textContent='Notify'; btn.removeAttribute('disabled'); return alert('Failed to notify: ' + (data && data.error ? data.error : '')); }
+      // Reflect locally
+      const badgeCell = row.children[2];
+      if (badgeCell && !badgeCell.querySelector('.badge.called')){
+        const b = document.createElement('span'); b.className='badge called'; b.textContent='called'; badgeCell.appendChild(b);
+      }
+      btn.textContent = 'Notified'; btn.setAttribute('disabled','true');
+    }
+
+    if (act === 'delete'){
+      if (!id) return alert('Missing id');
+      if (!confirm('Remove this patient from the queue?')) return;
+      const { ok, data } = await api('/api/tickets-delete?id='+encodeURIComponent(id));
+      if (!ok) return alert('Failed to delete: ' + (data && data.error ? data.error : ''));
+      // Remove current and details row
+      const tr = row;
+      const next = tr && tr.nextElementSibling;
+      if (tr) tr.remove();
+      if (next && next.querySelector && next.querySelector('.card')) next.remove();
+    }
+  });
   </script>
 </body>
 </html>
