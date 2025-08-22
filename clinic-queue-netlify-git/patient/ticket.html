@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,100 +7,83 @@
   <title>Your ticket</title>
   <style>
     :root{
-      --bg:#f6f8fb;
-      --card:#ffffff;
-      --ink:#0f172a;
-      --muted:#5b6b82;
-      --divider:#e5eaf2;
-      --green:#34c759;
-      --green-bg:#e8f9ee;
-      --green-ink:#0f8a3c;
-      --radius:18px;
-      --shadow:0 6px 24px rgba(18, 38, 63, 0.06);
+      --bg:#f7f8fb; --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+      --ok:#126e2d; --ok-bg:#e9f9ee; --ok-border:#bfeacb;
     }
-    html,body{background:var(--bg); color:var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Helvetica Neue", Arial; margin:0}
-    .wrap{max-width:900px; margin:32px auto; padding:0 16px}
-    .card{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:28px}
-    h1{font-size:34px; margin:0 0 12px}
-    .lead{color:var(--muted); margin-bottom:24px}
-    .row{display:flex; gap:18px; align-items:center; flex-wrap:wrap}
-    .badge{display:inline-flex; align-items:center; justify-content:center; min-width:64px; height:64px; border-radius:14px; background:#eef2ff; color:#1e2a78; font-weight:800; font-size:28px; padding:0 18px}
-    .muted{color:var(--muted)}
-    .callout{display:none;margin-top:18px;padding:14px 16px;border-radius:12px;background:#e8f7ee;border:1px solid #34d399;color:#065f46;font-weight:700;box-shadow:0 1px 0 rgba(0,0,0,.03)}
-    .section{margin-top:18px}
-    .grid{display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px}
-    .field{padding:14px; border:1px solid var(--divider); border-radius:14px}
-    @media (max-width:740px){ .grid{grid-template-columns:1fr} }
+    html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";}
+    .wrap{max-width:780px;margin:28px auto;padding:0 16px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+    h1{margin:0 0 14px 0;font-size:28px}
+    p.muted{color:var(--muted);margin-top:0}
+    .status{margin-top:18px;padding:14px 16px;border-radius:12px;border:1px solid var(--ok-border);background:var(--ok-bg);color:var(--ok);font-weight:700}
+    .row{display:flex;gap:16px;align-items:center;margin-top:18px}
+    .pill{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#334155;background:#f1f5f9}
+    .big{font-size:28px;font-weight:800}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Your ticket</h1>
-      <p class="lead">Keep this page open. We’ll update your status automatically.</p>
+      <p class="muted">Keep this page open. We'll update your status automatically.</p>
+
+      <div id="statusBox" class="status" style="display:none"></div>
 
       <div class="row">
-        <div class="badge" id="pos">—</div>
-        <div>
-          <div class="muted">Position in queue</div>
-          <div id="status" style="margin-top:6px; font-weight:700">—</div>
-        </div>
+        <div>Position in line:</div>
+        <div class="big" id="pos">—</div>
       </div>
-
-      <div id="callout" class="callout" style="display:none"></div>
-
-      <div class="section">
-        <div class="grid">
-          <div class="field"><strong>Name:</strong> <span id="name">—</span></div>
-          <div class="field"><strong>Primary complaint:</strong> <span id="complaint">—</span></div>
-          <div class="field"><strong>Reference:</strong> <span id="tid">—</span></div>
-          <div class="field"><strong>Created:</strong> <span id="created">—</span></div>
-        </div>
+      <div class="row">
+        <div>Ticket ID:</div>
+        <div class="pill" id="tid">—</div>
       </div>
     </div>
   </div>
 
-<script>
-const qs = new URLSearchParams(location.search);
-const id = qs.get('id');
+  <script>
+    function getIdFromUrl(){
+      const p = new URLSearchParams(location.search).get('id');
+      if(p) return p;
+      // optional hash fallback like #id=xxxx
+      if(location.hash){
+        const h = new URLSearchParams(location.hash.slice(1));
+        return h.get('id');
+      }
+      return null;
+    }
 
-function fmt(ts){
-  try{ return new Intl.DateTimeFormat(undefined,{day:'2-digit',month:'2-digit',year:'numeric', hour:'2-digit', minute:'2-digit'}).format(new Date(ts)); }
-  catch{ return ts; }
-}
+    const id = getIdFromUrl();
+    const tidEl = document.getElementById('tid');
+    const posEl = document.getElementById('pos');
+    const statusBox = document.getElementById('statusBox');
 
-async function load(){
-  if(!id){
-    document.getElementById('status').textContent = 'Missing ticket id.';
-    return;
-  }
-  const r = await fetch('/api/tickets-get?id='+encodeURIComponent(id));
-  const j = await r.json();
-  if(!j.ok || !j.item){
-    document.getElementById('status').textContent = 'Ticket not found.';
-    document.getElementById('pos').textContent = '—';
-    document.getElementById('callout').style.display = 'none';
-    return;
-  }
-  const t = j.item;
-  document.getElementById('tid').textContent = t.id;
-  document.getElementById('name').textContent = t.name || '—';
-  document.getElementById('complaint').textContent = t.complaint || '—';
-  document.getElementById('created').textContent = fmt(t.createdAt);
-  document.getElementById('pos').textContent = t.position ?? '—';
-  document.getElementById('status').textContent = t.status === 'called' ? 'Called' : 'Waiting';
-  // Prominent green callout when notified/called
-  const call = document.getElementById('callout');
-  if(t.status === 'called' || t.notifiedAt){
-    call.style.display = 'block';
-    call.textContent = "It's your turn now. Please proceed to the reception desk immediately.";
-  }else{
-    call.style.display = 'none';
-  }
-}
+    function showNotFound(){
+      document.body.querySelector('.card').innerHTML = '<h1>Your ticket</h1><p class="muted">Ticket not found.</p>';
+    }
 
-load();
-setInterval(load, 5000);
-</script>
+    async function read(){
+      if(!id){ showNotFound(); return; }
+      tidEl.textContent = id;
+      const res = await fetch('/api/tickets-get?id='+encodeURIComponent(id), {headers:{'cache-control':'no-cache'}});
+      const data = await res.json();
+      if(!data.ok || !data.item){ showNotFound(); return; }
+      const t = data.item;
+      posEl.textContent = (t.position ?? '—');
+      // show a visible green banner if notified/called
+      if(t.status==='called'){
+        statusBox.style.display='block';
+        statusBox.textContent = 'Please proceed to the examination room.';
+      }else if(t.notifiedAt){
+        statusBox.style.display='block';
+        statusBox.textContent = 'You are next. Please be ready at the waiting area.';
+      }else{
+        statusBox.style.display='none';
+        statusBox.textContent = '';
+      }
+    }
+
+    read();
+    setInterval(read, 8000);
+  </script>
 </body>
 </html>
