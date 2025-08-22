@@ -2,145 +2,159 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clinic queue</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Clinic Queue</title>
   <style>
-    :root { --bg:#f7f9fc; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb; --ok:#16a34a; --info:#3b82f6; --danger:#ef4444; }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
-    .wrap{max-width:1100px;margin:32px auto;padding:0 16px;}
-    h1{font-size:22px;font-weight:700;margin:0 0 16px;}
-    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.04);overflow:hidden;border:1px solid var(--line);}
-    table{width:100%;border-collapse:separate;border-spacing:0;}
-    thead th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);background:#fbfdff;}
-    tbody td{padding:16px;border-bottom:1px solid var(--line);vertical-align:middle;}
-    tbody tr:last-child td{border-bottom:0;}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:var(--muted);font-size:12px}
-    .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:600}
-    .pill.ok{background:#e7f7ed;color:#0a7a2f;border:1px solid #bbebc7}
-    .pill.info{background:#e8f1ff;color:#1652c1;border:1px solid #c7dcff}
-    .pill.muted{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
-    .btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
-    .btn:disabled{opacity:.55;cursor:default}
-    .btn-blue{background:#5b82f6;color:#fff}
-    .btn-red{background:#fee2e2;color:#991b1b}
-    .row-title{font-weight:700}
-    .sub{color:var(--muted);font-size:12px;margin-top:4px}
-    .num{width:48px;text-align:right;padding-right:8px}
-    .status-col{width:140px}
-    .actions-col{width:220px}
+    :root{--bg:#f6f7fb;--card:#fff;--text:#0f172a;--muted:#475569;--border:#e5e7eb;--accent:#0ea5e9;--good:#16a34a;--warn:#f59e0b;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+    h1{margin:8px 0 16px;font-weight:800;letter-spacing:-.02em}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:12px}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    th,td{padding:12px;vertical-align:top}
+    th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:12px}
+    tr.row{background:#fff;border:1px solid var(--border);border-radius:12px}
+    tr.row td:first-child{border-top-left-radius:12px;border-bottom-left-radius:12px}
+    tr.row td:last-child{border-top-right-radius:12px;border-bottom-right-radius:12px}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef6ff;color:#075985;font-weight:700;font-size:12px}
+    .actions button{border:0;border-radius:10px;padding:8px 10px;margin-right:8px;cursor:pointer}
+    .actions .notify{background:rgba(22,163,74,.12);color:#065f46}
+    .actions .delete{background:rgba(239,68,68,.1);color:#7f1d1d}
+    .muted{color:var(--muted)}
+    details{background:#fafafa;border:1px dashed var(--border);padding:10px;border-radius:10px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Queue</h1>
     <div class="card">
-      <table id="queue">
+      <table>
         <thead>
           <tr>
-            <th class="num">#</th>
-            <th>Name</th>
+            <th style="width:60px">#</th>
             <th>Primary complaint</th>
-            <th>Created</th>
-            <th class="status-col">Status</th>
-            <th class="actions-col">Actions</th>
+            <th style="width:180px">Created</th>
+            <th style="width:220px">Actions</th>
           </tr>
         </thead>
-        <tbody id="tbody">
-          <tr><td colspan="6" class="mono">Loading…</td></tr>
-        </tbody>
+        <tbody id="rows"></tbody>
       </table>
     </div>
   </div>
-
   <script>
-    const TBody = document.getElementById('tbody');
+    const rowsEl = document.getElementById('rows');
+    const EXPANDED_KEY = 'clinic_expanded_ids';
 
-    function fmtDate(iso) {
-      try {
-        const d = new Date(iso);
-        return d.toLocaleString([], { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-      } catch { return iso || ''; }
+    function getExpandedSet() {
+      try { return new Set(JSON.parse(sessionStorage.getItem(EXPANDED_KEY) || '[]')); }
+      catch { return new Set(); }
+    }
+    function setExpandedSet(s) {
+      sessionStorage.setItem(EXPANDED_KEY, JSON.stringify([...s]));
     }
 
     async function fetchList() {
-      const res = await fetch('/api/tickets-list', { cache:'no-store' });
-      const json = await res.json();
-      if (!json.ok) {
-        TBody.innerHTML = `<tr><td colspan="6" class="mono">Failed to load: ${json.error||'unknown'}</td></tr>`;
-        return;
+      const res = await fetch('/api/tickets-list');
+      if (!res.ok) return { items: [] };
+      return res.json();
+    }
+    async function notify(id) {
+      const res = await fetch('/api/tickets-notify?id='+encodeURIComponent(id), { method:'POST' });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) alert('Failed to notify: ' + JSON.stringify(data));
+      render();
+    }
+    async function removeTicket(id) {
+      const res = await fetch('/api/tickets-delete?id='+encodeURIComponent(id), { method:'DELETE' });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) alert('Failed to delete: ' + JSON.stringify(data));
+      render();
+    }
+
+    function fmt(ts) {
+      try { return new Date(ts).toLocaleString(); } catch { return ts; }
+    }
+
+    async function render() {
+      const expanded = getExpandedSet();
+      const list = await fetchList();
+      const waiting = (list.items||[]).filter(x => x.status === 'waiting')
+        .sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+      const others = (list.items||[]).filter(x => x.status !== 'waiting')
+        .sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+
+      const all = [...waiting, ...others];
+      rowsEl.innerHTML = '';
+
+      const indexMap = new Map(waiting.map((t,idx)=>[t.id, idx+1]));
+
+      for (const t of all) {
+        const tr = document.createElement('tr');
+        tr.className = 'row';
+
+        const number = indexMap.get(t.id);
+        const numTd = document.createElement('td');
+        numTd.innerHTML = number ? `<span class="pill">#${number}</span>` : `<span class="muted">—</span>`;
+
+        const primaryTd = document.createElement('td');
+        primaryTd.textContent = t.complaint || t.primary || '—';
+
+        const createdTd = document.createElement('td');
+        createdTd.textContent = fmt(t.createdAt);
+
+        const actionsTd = document.createElement('td');
+        actionsTd.className='actions';
+        actionsTd.innerHTML = `
+          <button class="notify">Notify</button>
+          <button class="delete">Delete</button>
+          <div class="muted" style="margin-top:6px">ID: ${t.id}</div>
+        `;
+
+        const row = document.createElement('tr');
+        row.append(numTd, primaryTd, createdTd, actionsTd);
+
+        // Expandable details row
+        const detTr = document.createElement('tr');
+        const detTd = document.createElement('td');
+        detTd.colSpan = 4;
+        detTd.innerHTML = `
+          <details ${expanded.has(t.id)?'open':''}>
+            <summary>Details</summary>
+            <div style="margin-top:8px">
+              <div><strong>Name:</strong> ${t.name||'—'}</div>
+              <div><strong>KT:</strong> ${t.kt||'—'}</div>
+              <div><strong>Phone:</strong> ${t.phone||'—'}</div>
+              <div><strong>Notes:</strong> ${t.notes||'—'}</div>
+              <div><strong>Status:</strong> ${t.status}</div>
+            </div>
+          </details>
+        `;
+        detTr.appendChild(detTd);
+
+        // action bindings
+        actionsTd.querySelector('.notify').onclick = ()=>notify(t.id);
+        actionsTd.querySelector('.delete').onclick = ()=>removeTicket(t.id);
+
+        // persist expanded toggles
+        detTd.querySelector('details').addEventListener('toggle', (ev)=>{
+          const set = getExpandedSet();
+          if (ev.target.open) set.add(t.id); else set.delete(t.id);
+          setExpandedSet(set);
+        });
+
+        rowsEl.append(row);
+        rowsEl.append(detTr);
       }
-      render(json.items || []);
     }
 
-    function rowHtml(item) {
-      const position = (item.position ?? 0) || 0;
-      const status = (item.status || 'waiting');
-      const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
-      const statusClass = status === 'called' ? 'ok' : (status === 'notified' ? 'info' : 'muted');
-      const notified = status === 'notified' || status === 'called';
-
-      return `
-        <tr data-id="${item.id}">
-          <td class="num">${position || ''}</td>
-          <td>
-            <div class="row-title">${(item.name || '').replace(/</g,'&lt;')}</div>
-            <div class="sub mono">ID: ${item.id}</div>
-          </td>
-          <td>${(item.complaint || '').replace(/</g,'&lt;')}</td>
-          <td>${fmtDate(item.createdAt)}</td>
-          <td><span class="pill ${statusClass}">${statusLabel}</span></td>
-          <td>
-            <button class="btn btn-blue" data-act="notify" ${notified ? 'disabled':''}>${notified ? 'Notified':'Notify'}</button>
-            <button class="btn btn-red" data-act="delete">Delete</button>
-          </td>
-        </tr>
-      `;
-    }
-
-    function render(items) {
-      if (!items.length) {
-        TBody.innerHTML = `<tr><td colspan="6" class="mono">No patients in queue.</td></tr>`;
-        return;
-      }
-      TBody.innerHTML = items.map(rowHtml).join('');
-    }
-
-    async function handleClick(e) {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      const tr = btn.closest('tr');
-      const id = tr?.dataset.id;
-      if (!id) return;
-
-      const act = btn.dataset.act;
-      try {
-        if (act === 'notify') {
-          const r = await fetch('/api/tickets-notify?id=' + encodeURIComponent(id), { method:'POST' });
-          const j = await r.json();
-          if (!j.ok) return alert('Failed to notify: ' + (j.error || 'unknown'));
-          // mutate button + status inline (avoid collapsing rows)
-          btn.textContent = 'Notified';
-          btn.disabled = true;
-          const statusPill = tr.querySelector('.pill');
-          if (statusPill) { statusPill.textContent = 'Notified'; statusPill.className = 'pill info'; }
-        } else if (act === 'delete') {
-          if (!confirm('Remove this patient from the queue?')) return;
-          const r = await fetch('/api/tickets-delete?id=' + encodeURIComponent(id), { method:'DELETE' });
-          const j = await r.json();
-          if (!j.ok) return alert('Failed to delete: ' + (j.error || 'unknown'));
-          tr.remove();
-          if (!TBody.children.length) fetchList();
-        }
-      } catch (err) {
-        alert('Action failed: ' + err.message);
-      }
-    }
-    TBody.addEventListener('click', handleClick);
-
-    fetchList();
-    // keep the page fresh but do not collapse rows because we modify inline
-    setInterval(fetchList, 15000);
+    render();
+    setInterval(render, 8000);
   </script>
+
+  <script src="/snippets/clinic-actions.js"></script>
+
 </body>
+  
 </html>
