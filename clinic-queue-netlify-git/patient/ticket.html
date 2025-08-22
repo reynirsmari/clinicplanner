@@ -6,84 +6,88 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Your ticket</title>
   <style>
-    :root{
-      --bg:#f7f8fb; --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
-      --ok:#126e2d; --ok-bg:#e9f9ee; --ok-border:#bfeacb;
-    }
-    html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";}
-    .wrap{max-width:780px;margin:28px auto;padding:0 16px;}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
-    h1{margin:0 0 14px 0;font-size:28px}
-    p.muted{color:var(--muted);margin-top:0}
-    .status{margin-top:18px;padding:14px 16px;border-radius:12px;border:1px solid var(--ok-border);background:var(--ok-bg);color:var(--ok);font-weight:700}
-    .row{display:flex;gap:16px;align-items:center;margin-top:18px}
-    .pill{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#334155;background:#f1f5f9}
-    .big{font-size:28px;font-weight:800}
+    :root { --bg:#f7f9fc; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb; --ok:#16a34a; --warn:#15803d; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+    .wrap{max-width:860px;margin:32px auto;padding:0 16px;}
+    h1{font-size:22px;font-weight:700;margin:0 0 14px;}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.04);padding:20px;border:1px solid var(--line);}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:var(--muted);font-size:12px}
+    .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:10px 0}
+    .badge{display:inline-block;padding:8px 12px;border-radius:10px;background:#eef2ff;color:#3730a3;font-weight:600}
+    .banner{margin-top:14px;border:1px solid #bbebc7;background:#e7f7ed;color:#0a7a2f;padding:12px 14px;border-radius:12px;font-weight:700}
+    .error{color:#b91c1c;background:#fee2e2;border:1px solid #fecaca}
   </style>
 </head>
 <body>
   <div class="wrap">
+    <h1>Your ticket</h1>
     <div class="card">
-      <h1>Your ticket</h1>
-      <p class="muted">Keep this page open. We'll update your status automatically.</p>
-
-      <div id="statusBox" class="status" style="display:none"></div>
-
-      <div class="row">
-        <div>Position in line:</div>
-        <div class="big" id="pos">—</div>
-      </div>
-      <div class="row">
-        <div>Ticket ID:</div>
-        <div class="pill" id="tid">—</div>
+      <div id="state" class="mono">Loading…</div>
+      <div id="content" style="display:none">
+        <div class="row"><strong>Ticket ID:</strong> <span class="mono" id="tid"></span></div>
+        <div class="row"><strong>Position in line:</strong> <span id="pos">—</span></div>
+        <div id="banner" class="banner" style="display:none"></div>
+        <div class="mono">Keep this page open. We’ll update your status automatically.</div>
       </div>
     </div>
   </div>
 
   <script>
-    function getIdFromUrl(){
-      const p = new URLSearchParams(location.search).get('id');
-      if(p) return p;
-      // optional hash fallback like #id=xxxx
-      if(location.hash){
-        const h = new URLSearchParams(location.hash.slice(1));
-        return h.get('id');
+    function getIdFromUrl() {
+      const u = new URL(window.location.href);
+      let id = u.searchParams.get('id');
+      if (!id && u.hash) {
+        const m = u.hash.match(/id=([^&]+)/);
+        if (m) id = decodeURIComponent(m[1]);
       }
-      return null;
+      return id || '';
     }
 
-    const id = getIdFromUrl();
-    const tidEl = document.getElementById('tid');
-    const posEl = document.getElementById('pos');
-    const statusBox = document.getElementById('statusBox');
+    async function load() {
+      const id = getIdFromUrl();
+      const state = document.getElementById('state');
+      const content = document.getElementById('content');
+      const tid = document.getElementById('tid');
+      if (!id) {
+        state.textContent = 'Ticket not found.';
+        state.classList.add('error');
+        return;
+      }
+      tid.textContent = id;
 
-    function showNotFound(){
-      document.body.querySelector('.card').innerHTML = '<h1>Your ticket</h1><p class="muted">Ticket not found.</p>';
-    }
-
-    async function read(){
-      if(!id){ showNotFound(); return; }
-      tidEl.textContent = id;
-      const res = await fetch('/api/tickets-get?id='+encodeURIComponent(id), {headers:{'cache-control':'no-cache'}});
-      const data = await res.json();
-      if(!data.ok || !data.item){ showNotFound(); return; }
-      const t = data.item;
-      posEl.textContent = (t.position ?? '—');
-      // show a visible green banner if notified/called
-      if(t.status==='called'){
-        statusBox.style.display='block';
-        statusBox.textContent = 'Please proceed to the examination room.';
-      }else if(t.notifiedAt){
-        statusBox.style.display='block';
-        statusBox.textContent = 'You are next. Please be ready at the waiting area.';
-      }else{
-        statusBox.style.display='none';
-        statusBox.textContent = '';
+      try {
+        const r = await fetch('/api/tickets-get?id=' + encodeURIComponent(id), { cache:'no-store' });
+        const j = await r.json();
+        if (!j.ok || !j.item) {
+          state.textContent = 'Ticket not found.';
+          state.classList.add('error');
+          return;
+        }
+        state.style.display = 'none';
+        content.style.display = '';
+        render(j.item);
+      } catch (e) {
+        state.textContent = 'Unable to load ticket.';
+        state.classList.add('error');
       }
     }
 
-    read();
-    setInterval(read, 8000);
+    function render(item) {
+      document.getElementById('pos').textContent = item.position ?? '—';
+      const banner = document.getElementById('banner');
+      if (item.status === 'called') {
+        banner.textContent = 'You have been called. Please proceed to the reception desk.';
+        banner.style.display = '';
+      } else if (item.status === 'notified') {
+        banner.textContent = 'You are next. Please make sure you are in the waiting room.';
+        banner.style.display = '';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    load();
+    setInterval(load, 15000);
   </script>
 </body>
 </html>
