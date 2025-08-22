@@ -1,146 +1,151 @@
-
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Your ticket</title>
   <style>
-    :root {
-      --bg:#f7f9fc; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb;
-      --ok:#16a34a; --ok-2:#14532d; --warn:#dc2626;
+    :root{
+      --bg:#f7f8fb; --card:#ffffff; --text:#0f172a; --muted:#64748b;
+      --line:#e5e7eb; --green:#16a34a; --blue:#2563eb; --amber:#b45309;
     }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;}
-    .wrap{max-width:860px;margin:32px auto;padding:0 16px;}
-    h1{font-size:22px;font-weight:700;margin:0 0 14px;}
-    .card{background:var(--card);border-radius:14px;box-shadow:0 4px 16px rgba(15,23,42,.06);
-      padding:20px;border:1px solid var(--line);}
-    .muted{color:var(--muted);}
-    .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:8px 0}
-    .badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:600}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
-    .banner{display:none;margin-top:14px;border:1px solid #bbf7d0;background:#dcfce7;color:#065f46;
-      padding:12px 14px;border-radius:12px;font-weight:700}
-    .error{display:none;margin-top:14px;border:1px solid #fecaca;background:#fee2e2;color:#7f1d1d;
-      padding:12px 14px;border-radius:12px;font-weight:600}
+    *{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    body{margin:0;background:var(--bg);color:var(--text)}
+    .wrap{max-width:760px;margin:32px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px 24px 28px;box-shadow:0 4px 10px rgba(15,23,42,.05)}
+    h1{font-size:28px;margin:0 0 10px 0}
+    p.muted{color:var(--muted);margin:0 0 20px 0}
+    .row{display:flex; gap:16px; flex-wrap:wrap; align-items:center}
+    .bigNumber{
+      font-size:48px;font-weight:800;line-height:1;
+      padding:16px 24px;border-radius:14px;
+      background:#eef2ff;border:1px solid #e0e7ff;color:#3730a3;
+      min-width:120px;text-align:center
+    }
+    .statusBanner{
+      margin-top:18px;padding:16px;border-radius:14px;border:1px solid #bbf7d0;background:#ecfdf5;
+      color:var(--green);font-weight:800;font-size:18px;
+    }
+    .warnBanner{
+      margin-top:18px;padding:16px;border-radius:14px;border:1px solid #fde68a;background:#fffbeb;color:var(--amber);font-weight:700
+    }
+    .mutedRow{color:var(--muted);font-size:14px;margin-top:10px}
+    .err{color:#b91c1c;font-weight:700}
+    .kv{display:grid;grid-template-columns:160px 1fr;gap:8px 12px;margin-top:10px}
+    .kv div:first-child{color:var(--muted)}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Your ticket</h1>
     <div class="card">
+      <h1>Your ticket</h1>
+      <p class="muted">Keep this page open. We'll update your status automatically.</p>
+
       <div class="row">
-        <div><span class="muted">Ticket ID:</span> <span id="ticket-id" class="mono">—</span></div>
-        <div><span class="muted">Name:</span> <span id="name">—</span></div>
-        <div><span class="muted">Primary complaint:</span> <span id="complaint">—</span></div>
-      </div>
-      <div class="row">
-        <div><span class="muted">Status:</span> <span id="status" class="badge">—</span></div>
-        <div><span class="muted">Your position in queue:</span> <strong id="position">—</strong></div>
+        <div>
+          <div class="muted">Your number in line</div>
+          <div id="position" class="bigNumber">—</div>
+        </div>
+        <div class="kv">
+          <div>Ticket ID</div><div id="ticketId">—</div>
+          <div>Name</div><div id="name">—</div>
+          <div>Primary complaint</div><div id="complaint">—</div>
+          <div>Status</div><div id="statusText">—</div>
+        </div>
       </div>
 
-      <div id="banner" class="banner"></div>
-      <div id="error" class="error"></div>
+      <div id="banner" style="display:none"></div>
+
+      <div id="error" class="err" style="display:none;margin-top:12px">Ticket not found.</div>
     </div>
   </div>
 
   <script>
-    function getIdRobust() {
-      try {
-        const u = new URL(location.href);
-        let id = u.searchParams.get('id');
-        if (!id) {
-          // manual parse (guard against stray unicode or rewrites)
-          const q = (location.href.split('?')[1] || '').split('#')[0];
-          for (const part of q.split('&')) {
-            const [k,v] = part.split('=');
-            if ((k||'').trim().toLowerCase() === 'id') { id = decodeURIComponent(v||''); break; }
-          }
-        }
-        if (!id) {
-          // sometimes the referrer still has it
-          try { id = new URL(document.referrer).searchParams.get('id') || id; } catch {}
-        }
-        if (!id) {
-          id = sessionStorage.getItem('lastTicketID') || localStorage.getItem('lastTicketID') || '';
-        }
-        return (id || '').replace(/[^a-zA-Z0-9_-]/g, '');
-      } catch { return ''; }
-    }
+    function robustId(){
+      const urlTry = new URL(location.href);
+      const qsId = urlTry.searchParams.get('id');
+      if(qsId) return qsId;
 
-    const els = {
-      id: document.getElementById('ticket-id'),
-      name: document.getElementById('name'),
-      complaint: document.getElementById('complaint'),
-      status: document.getElementById('status'),
-      position: document.getElementById('position'),
-      banner: document.getElementById('banner'),
-      error: document.getElementById('error'),
-    };
-
-    async function fetchJSON(url, options) {
-      const r = await fetch(url, options);
-      const t = await r.text();
-      try { return JSON.parse(t); } catch { return { ok:false, error:'Bad JSON', raw:t }; }
-    }
-
-    function setError(msg) {
-      els.error.textContent = msg;
-      els.error.style.display = '';
-    }
-
-    function updateBanner(item) {
-      // prefer explicit status; fall back to presence of notifiedAt
-      const status = item.status || (item.notifiedAt ? 'notified' : 'waiting');
-      if (status === 'called') {
-        els.banner.textContent = 'Please proceed to the consultation room now.';
-        els.banner.style.display = '';
-      } else if (status === 'notified') {
-        els.banner.textContent = 'You are next. Please make sure you are in the waiting room.';
-        els.banner.style.display = '';
-      } else {
-        els.banner.style.display = 'none';
+      // manual parse (in case URL APIs choke on odd encodings)
+      if(location.search && location.search.indexOf('id=')>=0){
+        const m = location.search.replace(/^\?/,'').split('&').map(s=>s.split('='));
+        for(const [k,v] of m){ if(k==='id') return decodeURIComponent(v||''); }
       }
+      // referrer
+      try{
+        const ref = document.referrer;
+        if(ref){
+          const q = new URL(ref).searchParams.get('id');
+          if(q) return q;
+        }
+      }catch{}
+      // storage
+      try{
+        const s = sessionStorage.getItem('lastTicketID') || localStorage.getItem('lastTicketID');
+        if(s) return s;
+      }catch{}
+      return '';
     }
 
-    async function refresh() {
-      const id = getIdRobust();
-      if (!id) {
-        setError('Missing ticket id in URL. If you just created a ticket, please open the link again from the confirmation.');
+    function setBanner(type, html){
+      const el = document.getElementById('banner');
+      el.className = type==='green' ? 'statusBanner' : 'warnBanner';
+      el.innerHTML = html;
+      el.style.display = 'block';
+    }
+
+    async function load(){
+      const id = robustId();
+      if(id) { try{ sessionStorage.setItem('lastTicketID', id); }catch{} }
+      document.getElementById('ticketId').textContent = id || '—';
+      if(!id){
+        document.getElementById('error').style.display='block';
         return;
       }
-      els.id.textContent = id;
-      // Get ticket details
-      const one = await fetchJSON('/api/tickets-get?id=' + encodeURIComponent(id));
-      if (!one.ok) { setError('Ticket not found'); return; }
 
-      const t = one.ticket || one;
-      els.name.textContent = t.name || '—';
-      els.complaint.textContent = t.complaint || '—';
-      els.status.textContent = (t.status || 'waiting').replace(/^./, c=>c.toUpperCase());
-
-      // Find position from the list
-      const list = await fetchJSON('/api/tickets-list');
-      if (list.ok && Array.isArray(list.items)) {
-        const hit = list.items.find(i => i.id === id);
-        if (hit) {
-          els.position.textContent = (hit.position != null ? hit.position : '—');
-          // update status from list if newer
-          if (hit.status) els.status.textContent = hit.status.replace(/^./, c=>c.toUpperCase());
-          updateBanner(hit);
-        } else {
-          els.position.textContent = '—';
-          updateBanner(t);
-        }
-      } else {
-        updateBanner(t);
+      const ticketRes = await fetch('/api/tickets-get?id='+encodeURIComponent(id));
+      const ticketJson = await ticketRes.json().catch(()=>({ok:false}));
+      if(!ticketJson.ok || !ticketJson.ticket){
+        document.getElementById('error').style.display='block';
+        return;
       }
-      sessionStorage.setItem('lastTicketID', id);
+      const t = ticketJson.ticket;
+      document.getElementById('name').textContent = t.name || '—';
+      document.getElementById('complaint').textContent = t.complaint || '—';
+      document.getElementById('statusText').textContent = t.status || '—';
+
+      // compute position from list
+      try{
+        const listRes = await fetch('/api/tickets-list');
+        const list = await listRes.json();
+        let pos = '—';
+        if(list && list.ok && Array.isArray(list.items)){
+          // items already contain position; find this id
+          const found = list.items.find(x=>x.id===t.id);
+          if(found && (found.position || found.position===0)) pos = found.position;
+          else{
+            // fallback compute position among waiting/notified/called order by createdAt
+            const waiting = list.items
+               .filter(x=>['waiting','notified','called'].includes(x.status))
+               .sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+            const idx = waiting.findIndex(x=>x.id===t.id);
+            if(idx>=0) pos = idx+1;
+          }
+        }
+        document.getElementById('position').textContent = pos;
+        // banners
+        if(t.status==='called'){
+          setBanner('green', '<strong>You have been called.</strong> Please proceed to the consultation room now.');
+        }else if(t.status==='notified'){
+          setBanner('green', '<strong>You are next.</strong> Please make sure you are in the waiting room.');
+        }else if(pos!== '—' && Number(pos)<=4){
+          setBanner('amber', '<strong>You are approaching your turn.</strong> Please make sure you are in the waiting room.');
+        }
+      }catch(e){}
     }
 
-    refresh();
-    setInterval(refresh, 15000);
+    load();
+    setInterval(load, 10000);
   </script>
 </body>
 </html>
