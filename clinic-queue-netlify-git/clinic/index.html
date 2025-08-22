@@ -1,194 +1,190 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Clinic queue</title>
-  <link rel="stylesheet" href="/styles.css">
   <style>
-    .action[disabled]{opacity:.55;cursor:not-allowed;background:#f3f4f6 !important;color:#9ca3af !important;border-color:#e5e7eb !important}
-    .muted{color:#6b7280}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#eef2ff;color:#1f2937;margin-left:6px}
-    .badge.called{background:#ecfdf5;color:#065f46}
-    .debug{display:none;white-space:pre-wrap;background:#0b1020;color:#cbd5e1;padding:12px;border-radius:8px;margin-top:12px}
-    .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:6px}
-    .table{width:100%;border-collapse:separate;border-spacing:0 10px}
-    .table th{font-size:12px;color:#6b7280;text-align:left;padding:0 12px}
-    .table td{background:#fff;padding:14px 12px}
+    :root{--bg:#f7f8fb;--panel:#ffffff;--text:#0f172a;--sub:#475569;--accent:#2563eb;--accent-2:#22c55e;--danger:#ef4444;--muted:#e2e8f0;}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+    header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--muted);z-index:10}
+    header .wrap{max-width:1100px;margin:auto;padding:16px 20px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+    h1{font-size:20px;margin:0}
+    main{max-width:1100px;margin:24px auto;padding:0 20px}
+    .card{background:var(--panel);border:1px solid var(--muted);border-radius:14px;overflow:hidden;box-shadow:0 10px 20px rgba(2,6,23,.04)}
+    table{width:100%;border-collapse:collapse}
+    thead th{font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);background:var(--bg);}
+    th,td{padding:14px 16px;border-bottom:1px solid var(--muted);vertical-align:top}
+    tbody tr.details td{background:#fbfdff}
+    .badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;font-size:12px;border:1px solid var(--muted);color:var(--sub);}
+    .pos{font-weight:700}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    button{appearance:none;border:1px solid var(--muted);background:#fff;color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    button.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .row{cursor:pointer}
+    .row:hover td{background:#f6faff}
+    .empty{padding:40px;text-align:center;color:var(--sub)}
+    .name{font-weight:600}
+    .nowrap{white-space:nowrap}
+    @media (max-width: 800px){
+      .hide-sm{display:none}
+      th,td{padding:12px}
+      header .wrap{padding:12px 16px}
+    }
   </style>
 </head>
 <body>
-  <main class="container">
-    <div class="panel">
-      <div class="toolbar">
-        <h1>Queue</h1>
-        <span class="small" id="updated"></span>
-      </div>
-      <div id="empty" class="muted" style="display:none;margin:8px 0 0">No patients in the queue.</div>
-      <table class="table" id="table"></table>
-      <div id="debug" class="debug"></div>
+  <header>
+    <div class="wrap">
+      <h1>Clinic queue</h1>
+      <div id="counts" class="badge">–</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th class="nowrap">#</th>
+            <th>Patient</th>
+            <th>Primary complaint</th>
+            <th class="hide-sm">Created</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="6" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
     </div>
   </main>
 
-  <script>
-  const table = document.getElementById('table');
-  const updated = document.getElementById('updated');
-  const emptyBox = document.getElementById('empty');
-  const debugBox = document.getElementById('debug');
-  const OPEN_KEY = 'clinic_open_rows';
-  let open = new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || '[]'));
-  const qs = new URLSearchParams(location.search);
-  const DEBUG = qs.get('debug') === '1';
+  <script type="module">
+    const tbody = document.getElementById('tbody');
+    const countsEl = document.getElementById('counts');
 
-  function logDebug(obj){
-    if(!DEBUG) return;
-    debugBox.style.display = 'block';
-    debugBox.textContent = (typeof obj === 'string') ? obj : JSON.stringify(obj, null, 2);
-  }
+    const expanded = new Set(JSON.parse(localStorage.getItem('clinic_expanded')||'[]'));
+    function persistExpanded(){ localStorage.setItem('clinic_expanded', JSON.stringify([...expanded])); }
 
-  function rowDetails(t){
-    return \`
-      <div class="kv">
-        <div><span>Ticket:</span> \${t.id}</div>
-        <div><span>Name:</span> \${t.name || t.fullName || '—'}</div>
-        <div><span>Phone:</span> \${t.phone || '—'}</div>
-        <div><span>ID:</span> \${t.kt || '—'}</div>
-        <div><span>Notes:</span> \${(t.notes || '—').replace(/</g,'&lt;')}</div>
-      </div>\`;
-  }
-
-  function draw(list){
-    table.innerHTML = '';
-    const thead = document.createElement('thead');
-    thead.innerHTML = \`<tr>
-      <th>#</th><th>Patient</th><th>Primary complaint</th><th>Created</th><th>ID</th><th>Actions</th>
-    </tr>\`;
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-
-    if (!Array.isArray(list) || list.length === 0){
-      emptyBox.style.display = 'block';
-      table.style.display = 'none';
-      return;
+    async function api(path, opts={}){
+      const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, ...opts});
+      let data;
+      try{ data = await r.json(); } catch(e){ data = {ok:false, error:'Invalid JSON'}; }
+      if(!data.ok) throw new Error(data.error || 'Request failed');
+      return data;
     }
-    emptyBox.style.display = 'none';
-    table.style.display = '';
 
-    list.forEach((t, idx) => {
-      const tr = document.createElement('tr');
-      tr.dataset.id = t.id;
-
-      const called = (t.status === 'called' || t.status === 'notified');
-      const pos = t.position || (idx + 1);
-      const name = t.name || t.fullName || '—';
-      const complaint = t.complaint || t.primaryComplaint || '—';
-      const created = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
-
-      const actions = \`
-        <button class="action" data-act="toggle">Details</button>
-        <button class="action" data-act="notify" data-id="\${t.id}" \${called ? 'disabled':''}>\${called ? 'Notified' : 'Notify'}</button>
-        <button class="action" data-act="delete" data-id="\${t.id}">Delete</button>
-      \`;
-
-      tr.innerHTML = \`
-        <td>#\${pos}</td>
-        <td>\${name}</td>
-        <td>\${complaint}\${called ? '<span class="badge called">called</span>':''}</td>
-        <td>\${created}</td>
-        <td style="font-family:ui-monospace,monospace">\${t.id}</td>
-        <td>\${actions}</td>
-      \`;
-      tbody.appendChild(tr);
-
-      const tr2 = document.createElement('tr');
-      const td = document.createElement('td');
-      td.colSpan = 6;
-      td.innerHTML = '<div class="card">'+rowDetails(t)+'</div>';
-      tr2.appendChild(td);
-      tbody.appendChild(tr2);
-
-      const isOpen = open.has(t.id);
-      tr2.style.display = isOpen ? '' : 'none';
-
-      tr.addEventListener('click', (e)=>{
-        if (e.target.closest('button')) return;
-        const now = !open.has(t.id);
-        if (now) open.add(t.id); else open.delete(t.id);
-        localStorage.setItem(OPEN_KEY, JSON.stringify(Array.from(open)));
-        tr2.style.display = now ? '' : 'none';
-      });
-    });
-    table.appendChild(tbody);
-  }
-
-  function pickListShape(data){
-    // Accept many shapes: {ok, items}, {tickets}, array directly, etc.
-    if (Array.isArray(data)) return data;
-    if (!data || typeof data !== 'object') return [];
-    return data.items || data.tickets || data.list || [];
-  }
-
-  async function api(url, body){
-    const res = await fetch(url, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body || {})
-    });
-    const data = await res.json().catch(()=>({ ok:false }));
-    return { ok: !!data.ok, data };
-  }
-
-  async function refresh(){
-    try{
-      const res = await fetch('/api/tickets-list');
-      const data = await res.json().catch(()=>({}));
-      logDebug({ from:'/api/tickets-list', data });
-      const list = pickListShape(data);
-      draw(list);
-      updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
-    }catch(e){
-      updated.textContent = 'Failed to load queue';
-      table.innerHTML = '';
-      emptyBox.style.display = 'block';
-      logDebug(String(e));
-    }
-  }
-  refresh();
-  setInterval(refresh, 5000);
-
-  document.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button.action');
-    if (!btn) return;
-    const row = btn.closest('tr');
-    const id = btn.dataset.id || (row ? row.dataset.id : null);
-    const act = btn.dataset.act;
-
-    if (act === 'notify'){
-      if (!id) return alert('Missing id');
-      btn.textContent = 'Notifying…'; btn.setAttribute('disabled','true');
-      const { ok, data } = await api('/api/tickets-notify?id='+encodeURIComponent(id));
-      if (!ok){ btn.textContent='Notify'; btn.removeAttribute('disabled'); return alert('Failed to notify: ' + (data && data.error ? data.error : '')); }
-      // Reflect locally
-      const badgeCell = row.children[2];
-      if (badgeCell && !badgeCell.querySelector('.badge.called')){
-        const b = document.createElement('span'); b.className='badge called'; b.textContent='called'; badgeCell.appendChild(b);
+    async function load(){
+      try{
+        const r = await fetch('/api/tickets-list', {cache:'no-store'});
+        const j = await r.json();
+        if(!j.ok) throw new Error(j.error || 'List failed');
+        render(j.items || []);
+      }catch(err){
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">Failed to load queue: '+err.message+'</td></tr>';
+        console.error(err);
       }
-      btn.textContent = 'Notified'; btn.setAttribute('disabled','true');
     }
 
-    if (act === 'delete'){
-      if (!id) return alert('Missing id');
-      if (!confirm('Remove this patient from the queue?')) return;
-      const { ok, data } = await api('/api/tickets-delete?id='+encodeURIComponent(id));
-      if (!ok) return alert('Failed to delete: ' + (data && data.error ? data.error : ''));
-      // Remove current and details row
-      const tr = row;
-      const next = tr && tr.nextElementSibling;
-      if (tr) tr.remove();
-      if (next && next.querySelector && next.querySelector('.card')) next.remove();
+    function fmtTime(iso){
+      try{
+        const d = new Date(iso);
+        return d.toLocaleString([], {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'});
+      }catch{ return iso; }
     }
-  });
+
+    function render(items){
+      if(!Array.isArray(items) || items.length===0){
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No patients in queue.</td></tr>';
+        countsEl.textContent = '0 waiting';
+        return;
+      }
+
+      // keep numeric order by position (existing API already provides)
+      items.sort((a,b)=>(a.position||999)-(b.position||999));
+
+      const waiting = items.filter(i=>i.status!=='done' && i.status!=='removed');
+      countsEl.textContent = waiting.length + ' in queue';
+
+      const rows = [];
+      for(const t of items){
+        const id = t.id;
+        const notified = !!t.notifiedAt;
+        const isExpanded = expanded.has(id);
+
+        rows.push(`
+          <tr class="row" data-id="${id}" onclick="window._toggle('${id}')">
+            <td class="pos">${t.position ?? '–'}</td>
+            <td><div class="name">${escapeHtml(t.name||'—')}</div>
+                <div class="badge hide-sm">ID: ${id}</div></td>
+            <td>${escapeHtml(t.complaint || '—')}</td>
+            <td class="hide-sm">${fmtTime(t.createdAt)}</td>
+            <td>${t.status==='called' ? '<span class="badge" style="border-color: var(--accent-2); color: var(--accent-2)">Called</span>' : '<span class="badge">Waiting</span>'}</td>
+            <td class="actions" onclick="event.stopPropagation()">
+              <button class="primary" data-action="notify" data-id="${id}" ${notified ? 'disabled':''}>${notified ? 'Notified' : 'Notify'}</button>
+              <button class="danger" data-action="delete" data-id="${id}">Delete</button>
+            </td>
+          </tr>
+          <tr class="details" id="det-${id}" style="display:${isExpanded?'table-row':'none'}">
+            <td></td>
+            <td colspan="5">
+              <div class="hide-sm"><strong>KT:</strong> ${escapeHtml(t.kt||'—')} &nbsp;&nbsp; <strong>Phone:</strong> ${escapeHtml(t.phone||'—')}</div>
+              <div><strong>Notes:</strong> ${escapeHtml(t.notes||'')}</div>
+              ${Array.isArray(t.redFlags)&&t.redFlags.length ? `<div><strong>Red flags:</strong> ${t.redFlags.map(escapeHtml).join(', ')}</div>`:''}
+            </td>
+          </tr>
+        `);
+      }
+      tbody.innerHTML = rows.join('');
+
+      // attach listeners
+      tbody.querySelectorAll('button[data-action="delete"]').forEach(btn=>{
+        btn.addEventListener('click', async (e)=>{
+          const id = btn.getAttribute('data-id');
+          try{
+            await api('/api/tickets-delete?id='+encodeURIComponent(id));
+            await load();
+          }catch(err){
+            alert('Failed to delete: '+err.message);
+          }
+        });
+      });
+      tbody.querySelectorAll('button[data-action="notify"]').forEach(btn=>{
+        btn.addEventListener('click', async (e)=>{
+          const id = btn.getAttribute('data-id');
+          try{
+            await api('/api/tickets-notify?id='+encodeURIComponent(id));
+            btn.textContent = 'Notified';
+            btn.setAttribute('disabled','');
+          }catch(err){
+            alert('Failed to notify: '+err.message);
+          }
+        });
+      });
+    }
+
+    // util: toggle details (called from row onclick)
+    window._toggle = (id)=>{
+      const tr = document.getElementById('det-'+id);
+      if(!tr) return;
+      const show = tr.style.display === 'none';
+      tr.style.display = show ? 'table-row' : 'none';
+      if(show) expanded.add(id); else expanded.delete(id);
+      persistExpanded();
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m]));
+    }
+
+    // poll
+    load();
+    setInterval(load, 5000);
   </script>
 </body>
 </html>
