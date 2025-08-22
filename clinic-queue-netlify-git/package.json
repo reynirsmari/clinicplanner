@@ -1,12 +1,8 @@
+
 {
-  "name": "clinic-queue-netlify",
-  "private": true,
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "netlify dev",
-    "build": "echo \"No build step\""
-  },
+  "name": "clinic-queue-normal",
+  "type": "module",
   "dependencies": {
-    "@netlify/blobs": "^6.3.0"
+    "@netlify/blobs": "^6.0.0"
   }
 }

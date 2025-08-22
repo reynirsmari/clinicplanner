@@ -1,23 +1,20 @@
-<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clinic Queue</title>
-<style>
-:root{--bg:#f5f7fb;--panel:#fff;--ink:#0f172a;--muted:#64748b;--border:#e5e7eb;}
-*{box-sizing:border-box;font-family:-apple-system,system-ui,"SF Pro Text",Segoe UI,Roboto,Helvetica,Arial}
-body{margin:0;background:var(--bg);color:var(--ink)}
-.wrap{max-width:880px;margin:0 auto;padding:28px}
-h1{margin:0 0 14px 0;font-size:24px}
-.grid{display:grid;grid-template-columns:1fr;gap:16px}
-@media(min-width:720px){.grid{grid-template-columns:1fr 1fr}}
-a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.06)}
-.cap{color:var(--muted);font-size:12px}.big{font-size:20px;font-weight:700;margin-top:8px}
-.notice{margin-top:12px;font-size:12px;color:var(--muted)}
-</style></head><body>
-<div class="wrap">
-  <h1>Clinic Queue</h1>
-  <div class="grid">
-    <a class="card" href="./patient/index.html"><div class="cap">Public</div><div class="big">Patient check‑in</div></a>
-    <a class="card" href="./clinic/index.html"><div class="cap">Staff</div><div class="big">Clinic dashboard</div></a>
-  </div>
-  <p class="notice">Serverless API: <code>/.netlify/functions/health</code> should return JSON.</p>
-</div></body></html>
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clinic Queue</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Clinic Queue</h1>
+    <p>Welcome. Choose where you want to go:</p>
+    <div class="actions">
+      <a class="button" href="/patient/">Patient check‑in</a>
+      <a class="button button-secondary" href="/clinic/">Clinic queue</a>
+    </div>
+  </main>
+</body>
+</html>

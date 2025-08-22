@@ -1,17 +1,19 @@
-const { getTicketsStore } = require('./_shared/store');
 
-module.exports.handler = async () => {
+export async function handler() {
   try {
-    const store = await getTicketsStore();
-    const items = [];
-    const { blobs } = await store.list({ prefix: 'tickets/' });
-    for (const b of blobs) {
-      const json = await store.get(b.key, { type: 'json' });
-      if (json) items.push(json);
+    const { getJson, list } = await import('./_shared/storage.js');
+    const keys = await list('tickets/');
+    const out = [];
+    for (const k of keys) {
+      const t = await getJson(k);
+      if (t && t.status !== 'done') out.push(t);
     }
-    items.sort((a,b) => (a.createdAt > b.createdAt ? -1 : 1));
-    return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:true, count: items.length, items }) };
+    out.sort((a,b)=> a.createdAt.localeCompare(b.createdAt));
+    // annotate positions
+    out.forEach((t,i)=> t.position = i+1);
+    return res({ ok:true, items: out });
   } catch (err) {
-    return { statusCode: 500, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:false, error: err.message }) };
+    return res({ ok:false, error: String(err.message || err) }, 500);
   }
-};
+}
+function res(body, status=200){ return { statusCode: status, headers: { 'content-type':'application/json' }, body: JSON.stringify(body) }; }
