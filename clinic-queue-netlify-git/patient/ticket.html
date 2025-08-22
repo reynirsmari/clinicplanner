@@ -6,88 +6,141 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Your ticket</title>
   <style>
-    :root { --bg:#f7f9fc; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb; --ok:#16a34a; --warn:#15803d; }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+    :root {
+      --bg:#f7f9fc; --card:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb;
+      --ok:#16a34a; --ok-2:#14532d; --warn:#dc2626;
+    }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;}
     .wrap{max-width:860px;margin:32px auto;padding:0 16px;}
     h1{font-size:22px;font-weight:700;margin:0 0 14px;}
-    .card{background:var(--card);border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.04);padding:20px;border:1px solid var(--line);}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:var(--muted);font-size:12px}
-    .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:10px 0}
-    .badge{display:inline-block;padding:8px 12px;border-radius:10px;background:#eef2ff;color:#3730a3;font-weight:600}
-    .banner{margin-top:14px;border:1px solid #bbebc7;background:#e7f7ed;color:#0a7a2f;padding:12px 14px;border-radius:12px;font-weight:700}
-    .error{color:#b91c1c;background:#fee2e2;border:1px solid #fecaca}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 4px 16px rgba(15,23,42,.06);
+      padding:20px;border:1px solid var(--line);}
+    .muted{color:var(--muted);}
+    .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:8px 0}
+    .badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:600}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .banner{display:none;margin-top:14px;border:1px solid #bbf7d0;background:#dcfce7;color:#065f46;
+      padding:12px 14px;border-radius:12px;font-weight:700}
+    .error{display:none;margin-top:14px;border:1px solid #fecaca;background:#fee2e2;color:#7f1d1d;
+      padding:12px 14px;border-radius:12px;font-weight:600}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Your ticket</h1>
     <div class="card">
-      <div id="state" class="mono">Loading…</div>
-      <div id="content" style="display:none">
-        <div class="row"><strong>Ticket ID:</strong> <span class="mono" id="tid"></span></div>
-        <div class="row"><strong>Position in line:</strong> <span id="pos">—</span></div>
-        <div id="banner" class="banner" style="display:none"></div>
-        <div class="mono">Keep this page open. We’ll update your status automatically.</div>
+      <div class="row">
+        <div><span class="muted">Ticket ID:</span> <span id="ticket-id" class="mono">—</span></div>
+        <div><span class="muted">Name:</span> <span id="name">—</span></div>
+        <div><span class="muted">Primary complaint:</span> <span id="complaint">—</span></div>
       </div>
+      <div class="row">
+        <div><span class="muted">Status:</span> <span id="status" class="badge">—</span></div>
+        <div><span class="muted">Your position in queue:</span> <strong id="position">—</strong></div>
+      </div>
+
+      <div id="banner" class="banner"></div>
+      <div id="error" class="error"></div>
     </div>
   </div>
 
   <script>
-    function getIdFromUrl() {
-      const u = new URL(window.location.href);
-      let id = u.searchParams.get('id');
-      if (!id && u.hash) {
-        const m = u.hash.match(/id=([^&]+)/);
-        if (m) id = decodeURIComponent(m[1]);
-      }
-      return id || '';
+    function getIdRobust() {
+      try {
+        const u = new URL(location.href);
+        let id = u.searchParams.get('id');
+        if (!id) {
+          // manual parse (guard against stray unicode or rewrites)
+          const q = (location.href.split('?')[1] || '').split('#')[0];
+          for (const part of q.split('&')) {
+            const [k,v] = part.split('=');
+            if ((k||'').trim().toLowerCase() === 'id') { id = decodeURIComponent(v||''); break; }
+          }
+        }
+        if (!id) {
+          // sometimes the referrer still has it
+          try { id = new URL(document.referrer).searchParams.get('id') || id; } catch {}
+        }
+        if (!id) {
+          id = sessionStorage.getItem('lastTicketID') || localStorage.getItem('lastTicketID') || '';
+        }
+        return (id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      } catch { return ''; }
     }
 
-    async function load() {
-      const id = getIdFromUrl();
-      const state = document.getElementById('state');
-      const content = document.getElementById('content');
-      const tid = document.getElementById('tid');
+    const els = {
+      id: document.getElementById('ticket-id'),
+      name: document.getElementById('name'),
+      complaint: document.getElementById('complaint'),
+      status: document.getElementById('status'),
+      position: document.getElementById('position'),
+      banner: document.getElementById('banner'),
+      error: document.getElementById('error'),
+    };
+
+    async function fetchJSON(url, options) {
+      const r = await fetch(url, options);
+      const t = await r.text();
+      try { return JSON.parse(t); } catch { return { ok:false, error:'Bad JSON', raw:t }; }
+    }
+
+    function setError(msg) {
+      els.error.textContent = msg;
+      els.error.style.display = '';
+    }
+
+    function updateBanner(item) {
+      // prefer explicit status; fall back to presence of notifiedAt
+      const status = item.status || (item.notifiedAt ? 'notified' : 'waiting');
+      if (status === 'called') {
+        els.banner.textContent = 'Please proceed to the consultation room now.';
+        els.banner.style.display = '';
+      } else if (status === 'notified') {
+        els.banner.textContent = 'You are next. Please make sure you are in the waiting room.';
+        els.banner.style.display = '';
+      } else {
+        els.banner.style.display = 'none';
+      }
+    }
+
+    async function refresh() {
+      const id = getIdRobust();
       if (!id) {
-        state.textContent = 'Ticket not found.';
-        state.classList.add('error');
+        setError('Missing ticket id in URL. If you just created a ticket, please open the link again from the confirmation.');
         return;
       }
-      tid.textContent = id;
+      els.id.textContent = id;
+      // Get ticket details
+      const one = await fetchJSON('/api/tickets-get?id=' + encodeURIComponent(id));
+      if (!one.ok) { setError('Ticket not found'); return; }
 
-      try {
-        const r = await fetch('/api/tickets-get?id=' + encodeURIComponent(id), { cache:'no-store' });
-        const j = await r.json();
-        if (!j.ok || !j.item) {
-          state.textContent = 'Ticket not found.';
-          state.classList.add('error');
-          return;
+      const t = one.ticket || one;
+      els.name.textContent = t.name || '—';
+      els.complaint.textContent = t.complaint || '—';
+      els.status.textContent = (t.status || 'waiting').replace(/^./, c=>c.toUpperCase());
+
+      // Find position from the list
+      const list = await fetchJSON('/api/tickets-list');
+      if (list.ok && Array.isArray(list.items)) {
+        const hit = list.items.find(i => i.id === id);
+        if (hit) {
+          els.position.textContent = (hit.position != null ? hit.position : '—');
+          // update status from list if newer
+          if (hit.status) els.status.textContent = hit.status.replace(/^./, c=>c.toUpperCase());
+          updateBanner(hit);
+        } else {
+          els.position.textContent = '—';
+          updateBanner(t);
         }
-        state.style.display = 'none';
-        content.style.display = '';
-        render(j.item);
-      } catch (e) {
-        state.textContent = 'Unable to load ticket.';
-        state.classList.add('error');
-      }
-    }
-
-    function render(item) {
-      document.getElementById('pos').textContent = item.position ?? '—';
-      const banner = document.getElementById('banner');
-      if (item.status === 'called') {
-        banner.textContent = 'You have been called. Please proceed to the reception desk.';
-        banner.style.display = '';
-      } else if (item.status === 'notified') {
-        banner.textContent = 'You are next. Please make sure you are in the waiting room.';
-        banner.style.display = '';
       } else {
-        banner.style.display = 'none';
+        updateBanner(t);
       }
+      sessionStorage.setItem('lastTicketID', id);
     }
 
-    load();
-    setInterval(load, 5000);
+    refresh();
+    setInterval(refresh, 15000);
   </script>
 </body>
 </html>
