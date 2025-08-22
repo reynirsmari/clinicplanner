@@ -1,26 +1,15 @@
+const { getTicketsStore } = require('./_shared/store');
 
-export async function handler(event) {
+module.exports.handler = async (event) => {
   try {
-    const id = event.queryStringParameters?.id;
-    if (!id) return res({ ok:false, error:'Missing id' }, 400);
-
-    const { getJson, list } = await import('./_shared/storage.js');
-    const item = await getJson(`tickets/${id}.json`);
-    if (!item) return res({ ok:false, error:'Not found' }, 404);
-
-    // compute position among waiting and not-done
-    const keys = await list('tickets/');
-    const all = [];
-    for (const k of keys) {
-      const one = await getJson(k);
-      if (one && one.status !== 'done') all.push(one);
-    }
-    all.sort((a,b)=> a.createdAt.localeCompare(b.createdAt));
-    const position = all.findIndex(t => t.id === id) + 1;
-
-    return res({ ok:true, item, position });
+    const id = (event.queryStringParameters && event.queryStringParameters.id) || '';
+    if (!id) return { statusCode: 400, body: JSON.stringify({ ok:false, error: 'Missing id' }) };
+    const store = await getTicketsStore();
+    const key = `tickets/${id}.json`;
+    const json = await store.get(key, { type: 'json' });
+    if (!json) return { statusCode: 404, body: JSON.stringify({ ok:false, error: 'Not found' }) };
+    return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:true, ticket: json }) };
   } catch (err) {
-    return res({ ok:false, error: String(err.message || err) }, 500);
+    return { statusCode: 500, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:false, error: err.message }) };
   }
-}
-function res(body, status=200){ return { statusCode: status, headers: { 'content-type':'application/json' }, body: JSON.stringify(body) }; }
+};

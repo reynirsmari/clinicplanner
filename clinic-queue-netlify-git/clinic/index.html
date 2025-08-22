@@ -2,97 +2,159 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Clinic queue</title>
-  <link rel="stylesheet" href="/styles.css">
-  <script defer src="/snippets/clinic-actions.js"></script>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Clinic Queue</title>
+  <style>
+    :root{--bg:#f6f7fb;--card:#fff;--text:#0f172a;--muted:#475569;--border:#e5e7eb;--accent:#0ea5e9;--good:#16a34a;--warn:#f59e0b;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+    h1{margin:8px 0 16px;font-weight:800;letter-spacing:-.02em}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:12px}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    th,td{padding:12px;vertical-align:top}
+    th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:12px}
+    tr.row{background:#fff;border:1px solid var(--border);border-radius:12px}
+    tr.row td:first-child{border-top-left-radius:12px;border-bottom-left-radius:12px}
+    tr.row td:last-child{border-top-right-radius:12px;border-bottom-right-radius:12px}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef6ff;color:#075985;font-weight:700;font-size:12px}
+    .actions button{border:0;border-radius:10px;padding:8px 10px;margin-right:8px;cursor:pointer}
+    .actions .notify{background:rgba(22,163,74,.12);color:#065f46}
+    .actions .delete{background:rgba(239,68,68,.1);color:#7f1d1d}
+    .muted{color:var(--muted)}
+    details{background:#fafafa;border:1px dashed var(--border);padding:10px;border-radius:10px}
+  </style>
 </head>
 <body>
-  <main class="container">
-    <div class="panel">
-      <div class="row-head">
-        <h1>Queue</h1>
-        <span class="small" id="updated"></span>
-      </div>
-      <table class="table" id="table"></table>
+  <div class="wrap">
+    <h1>Queue</h1>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">#</th>
+            <th>Primary complaint</th>
+            <th style="width:180px">Created</th>
+            <th style="width:220px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
     </div>
-  </main>
+  </div>
   <script>
-  const table = document.getElementById('table');
-  const updated = document.getElementById('updated');
-  const OPEN_KEY = 'clinic_open_rows';
-  let open = new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || '[]'));
+    const rowsEl = document.getElementById('rows');
+    const EXPANDED_KEY = 'clinic_expanded_ids';
 
-  function rowDetails(t){
-    return \`
-      <div class="kv">
-        <div><span>Ticket:</span> \${t.id}</div>
-        <div><span>Name:</span> \${t.name}</div>
-        <div><span>Phone:</span> \${t.phone}</div>
-        <div><span>ID:</span> \${t.kt}</div>
-        <div><span>Notes:</span> \${t.notes || '—'}</div>
-      </div>\`;
-  }
-
-  function draw(list){
-    table.innerHTML = '';
-    const thead = document.createElement('thead');
-    thead.innerHTML = \`<tr>
-      <th>#</th><th>Primary complaint</th><th>Created</th><th>ID</th><th>Actions</th>
-    </tr>\`;
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    list.forEach((t, idx) => {
-      const tr = document.createElement('tr');
-      tr.dataset.id = t.id;
-      const actions = \`
-        <button class="action" data-act="toggle">Details</button>
-        <button class="action" data-act="notify" data-id="\${t.id}">Notify</button>
-        <button class="action" data-act="delete" data-id="\${t.id}">Delete</button>
-      \`;
-      tr.innerHTML = \`
-        <td>#\${t.position}</td>
-        <td>\${t.complaint}</td>
-        <td>\${new Date(t.createdAt).toLocaleString()}</td>
-        <td>\${t.id}</td>
-        <td>\${actions}</td>
-      \`;
-      tbody.appendChild(tr);
-
-      const tr2 = document.createElement('tr');
-      const td = document.createElement('td');
-      td.colSpan = 5;
-      td.innerHTML = '<div class="card">'+rowDetails(t)+'</div>';
-      tr2.appendChild(td);
-      tbody.appendChild(tr2);
-
-      const isOpen = open.has(t.id);
-      tr2.style.display = isOpen ? '' : 'none';
-
-      tr.addEventListener('click', (e)=>{
-        if (e.target.closest('button')) return;
-        const now = !open.has(t.id);
-        if (now) open.add(t.id); else open.delete(t.id);
-        localStorage.setItem(OPEN_KEY, JSON.stringify(Array.from(open)));
-        tr2.style.display = now ? '' : 'none';
-      });
-    });
-    table.appendChild(tbody);
-  }
-
-  async function refresh(){
-    const res = await fetch('/api/tickets-list');
-    const data = await res.json().catch(()=>({}));
-    if (data.ok){
-      draw(data.items);
-      updated.textContent = 'Updated '+new Date().toLocaleTimeString();
-    } else {
-      updated.textContent = 'Failed to load queue';
+    function getExpandedSet() {
+      try { return new Set(JSON.parse(sessionStorage.getItem(EXPANDED_KEY) || '[]')); }
+      catch { return new Set(); }
     }
-  }
-  refresh();
-  setInterval(refresh, 5000);
+    function setExpandedSet(s) {
+      sessionStorage.setItem(EXPANDED_KEY, JSON.stringify([...s]));
+    }
+
+    async function fetchList() {
+      const res = await fetch('/api/tickets-list');
+      if (!res.ok) return { items: [] };
+      return res.json();
+    }
+    async function notify(id) {
+      const res = await fetch('/api/tickets-notify?id='+encodeURIComponent(id), { method:'POST' });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) alert('Failed to notify: ' + JSON.stringify(data));
+      render();
+    }
+    async function removeTicket(id) {
+      const res = await fetch('/api/tickets-delete?id='+encodeURIComponent(id), { method:'DELETE' });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) alert('Failed to delete: ' + JSON.stringify(data));
+      render();
+    }
+
+    function fmt(ts) {
+      try { return new Date(ts).toLocaleString(); } catch { return ts; }
+    }
+
+    async function render() {
+      const expanded = getExpandedSet();
+      const list = await fetchList();
+      const waiting = (list.items||[]).filter(x => x.status === 'waiting')
+        .sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+      const others = (list.items||[]).filter(x => x.status !== 'waiting')
+        .sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+
+      const all = [...waiting, ...others];
+      rowsEl.innerHTML = '';
+
+      const indexMap = new Map(waiting.map((t,idx)=>[t.id, idx+1]));
+
+      for (const t of all) {
+        const tr = document.createElement('tr');
+        tr.className = 'row';
+
+        const number = indexMap.get(t.id);
+        const numTd = document.createElement('td');
+        numTd.innerHTML = number ? `<span class="pill">#${number}</span>` : `<span class="muted">—</span>`;
+
+        const primaryTd = document.createElement('td');
+        primaryTd.textContent = t.complaint || t.primary || '—';
+
+        const createdTd = document.createElement('td');
+        createdTd.textContent = fmt(t.createdAt);
+
+        const actionsTd = document.createElement('td');
+        actionsTd.className='actions';
+        actionsTd.innerHTML = `
+          <button class="notify">Notify</button>
+          <button class="delete">Delete</button>
+          <div class="muted" style="margin-top:6px">ID: ${t.id}</div>
+        `;
+
+        const row = document.createElement('tr');
+        row.append(numTd, primaryTd, createdTd, actionsTd);
+
+        // Expandable details row
+        const detTr = document.createElement('tr');
+        const detTd = document.createElement('td');
+        detTd.colSpan = 4;
+        detTd.innerHTML = `
+          <details ${expanded.has(t.id)?'open':''}>
+            <summary>Details</summary>
+            <div style="margin-top:8px">
+              <div><strong>Name:</strong> ${t.name||'—'}</div>
+              <div><strong>KT:</strong> ${t.kt||'—'}</div>
+              <div><strong>Phone:</strong> ${t.phone||'—'}</div>
+              <div><strong>Notes:</strong> ${t.notes||'—'}</div>
+              <div><strong>Status:</strong> ${t.status}</div>
+            </div>
+          </details>
+        `;
+        detTr.appendChild(detTd);
+
+        // action bindings
+        actionsTd.querySelector('.notify').onclick = ()=>notify(t.id);
+        actionsTd.querySelector('.delete').onclick = ()=>removeTicket(t.id);
+
+        // persist expanded toggles
+        detTd.querySelector('details').addEventListener('toggle', (ev)=>{
+          const set = getExpandedSet();
+          if (ev.target.open) set.add(t.id); else set.delete(t.id);
+          setExpandedSet(set);
+        });
+
+        rowsEl.append(row);
+        rowsEl.append(detTr);
+      }
+    }
+
+    render();
+    setInterval(render, 8000);
   </script>
+
+  <script src="/snippets/clinic-actions.js"></script>
+
 </body>
+  
 </html>

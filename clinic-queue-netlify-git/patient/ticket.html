@@ -2,54 +2,86 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Your ticket</title>
-  <link rel="stylesheet" href="/styles.css">
+  <style>
+    :root{
+      --bg:#f7f8fb;--card:#fff;--text:#121826;--muted:#6b7280;--good:#16a34a;--border:#e5e7eb;--accent:#0ea5e9;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:760px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);padding:24px}
+    h1{margin:0 0 6px;font-weight:800;letter-spacing:-.02em}
+    p.lead{margin:0 0 16px;color:var(--muted)}
+    .pill{display:inline-block;background:#eef6ff;color:#0369a1;border-radius:999px;padding:8px 12px;font-weight:700}
+    .notice{margin-top:10px;border-left:4px solid var(--accent);padding:8px 12px;background:#eef6ff;color:#075985;border-radius:8px}
+    .ok{background:#ecfdf5;color:#065f46;border-left-color:var(--good)}
+  </style>
 </head>
 <body>
-  <main class="container">
-    <div class="panel">
+  <div class="wrap">
+    <div class="card">
       <h1>Your ticket</h1>
-      <p>Keep this page open. We’ll update your status automatically.</p>
-      <div id="status" class="kv"></div>
-      <div id="advice" class="notice" style="display:none"></div>
+      <p class="lead">Keep this page open. We’ll update your status automatically.</p>
+      <div id="statusRow">
+        <span id="queuePill" class="pill">Loading position…</span>
+        <div id="advice" class="notice" style="display:none"></div>
+        <div id="notify" class="notice ok" style="display:none">It’s your turn. Please proceed to the reception desk.</div>
+      </div>
     </div>
-  </main>
+  </div>
   <script>
-  const params = new URLSearchParams(location.search);
-  const id = params.get('id');
-  const statusEl = document.getElementById('status');
-  const advice = document.getElementById('advice');
+    const params = new URLSearchParams(location.search);
+    const ticketId = params.get('id');
 
-  async function refresh(){
-    if (!id) {
-      statusEl.innerHTML = '<div><span>Ticket:</span> not found</div>';
-      return;
+    const pill = document.getElementById('queuePill');
+    const advice = document.getElementById('advice');
+    const notifyBox = document.getElementById('notify');
+
+    async function getPosition() {
+      try {
+        const [listRes, getRes] = await Promise.all([
+          fetch('/api/tickets-list'),
+          fetch('/api/tickets-get?id=' + encodeURIComponent(ticketId))
+        ]);
+        const list = await listRes.json().catch(()=>({items:[]}));
+        const ticket = await getRes.json().catch(()=>null);
+
+        if (getRes.status === 404 || !ticket) {
+          pill.textContent = 'Ticket not found';
+          return;
+        }
+
+        const waiting = (list.items || []).filter(x => x.status === 'waiting')
+          .sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+        const pos = waiting.findIndex(x => x.id === ticketId);
+        if (pos >= 0) {
+          const spot = pos + 1;
+          pill.textContent = `You are #${spot} in line`;
+          advice.style.display = spot <= 4 ? 'block' : 'none';
+          advice.textContent = 'You are approaching the front of the line. Please ensure you are in the waiting area so we can call you promptly.';
+        } else {
+          // Not waiting anymore; check status for "called" or removed
+          if (ticket.status === 'called') {
+            notifyBox.style.display = 'block';
+            pill.textContent = 'Please proceed to reception';
+          } else {
+            pill.textContent = 'Ticket not found';
+          }
+        }
+      } catch (e) {
+        // swallow
+      }
     }
-    const res = await fetch('/api/tickets-get?id='+encodeURIComponent(id));
-    const data = await res.json().catch(()=>({}));
-    if (!data.ok || !data.item) {
-      statusEl.innerHTML = '<div><span>Ticket:</span> not found</div>';
-      return;
-    }
-    const t = data.item;
-    statusEl.innerHTML = `
-      <div><span>Ticket ID:</span> ${t.id}</div>
-      <div><span>Name:</span> ${t.name}</div>
-      <div><span>Primary complaint:</span> ${t.complaint}</div>
-      <div><span>Status:</span> ${t.notified ? 'Being called' : 'Waiting'}</div>
-      <div><span>Your position in line:</span> #${data.position}</div>
-    `;
-    if (data.position <= 4 && !t.notified) {
-      advice.style.display = 'block';
-      advice.textContent = 'Please make sure you are in the waiting area. You may be called soon.';
+
+    if (!ticketId) {
+      pill.textContent = 'Missing ticket id';
     } else {
-      advice.style.display = 'none';
+      getPosition();
+      setInterval(getPosition, 8000);
     }
-  }
-  refresh();
-  setInterval(refresh, 5000);
   </script>
 </body>
 </html>

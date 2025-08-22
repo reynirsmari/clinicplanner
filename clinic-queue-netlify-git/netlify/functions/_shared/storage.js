@@ -1,56 +1,46 @@
+// CommonJS on purpose (works with your current build)
+const { createClient } = require('@netlify/blobs');
 
-/**
- * Storage helper that works with multiple @netlify/blobs versions and
- * both auto and manual environment.  Defaults to store name 'queue'.
- */
-export async function openStore() {
-  const mod = await import('@netlify/blobs');
-  const name = process.env.BLOBS_STORE || 'queue';
+function ensureStore() {
+  const siteID =
+    process.env.BLOBS_SITE_ID ||
+    process.env.NETLIFY_SITE_ID ||
+    process.env.SITE_ID;
 
-  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
-  const token  = process.env.BLOBS_TOKEN    || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_TOKEN;
+  const token =
+    process.env.BLOBS_TOKEN ||
+    process.env.NETLIFY_API_TOKEN ||
+    process.env.NETLIFY_TOKEN;
 
-  // Try new signature: getStore({ name, siteID?, token? })
-  if (typeof mod.getStore === 'function') {
-    try {
-      return mod.getStore({ name, ...(siteID && token ? { siteID, token } : {}) });
-    } catch (e) {
-      // Try legacy signature: getStore(name, { siteID, token })
-      try {
-        return mod.getStore(name, (siteID && token) ? { siteID, token } : {});
-      } catch (e2) {
-        throw e2;
-      }
-    }
+  const storeName = process.env.BLOBS_STORE || 'queue';
+
+  if (!siteID || !token) {
+    throw new Error('Missing BLOBS credentials (siteID/token).');
   }
-  // Older: createClient + client.store(name)
-  if (typeof mod.createClient === 'function') {
-    const client = mod.createClient((siteID && token) ? { siteID, token } : {});
-    if (typeof client.store === 'function') {
-      return client.store(name);
-    }
-  }
-  throw new Error('Unsupported @netlify/blobs version');
+
+  const client = createClient({ siteID, token });
+  return client.store(storeName);
 }
 
-export async function putJson(key, value){
-  const store = await openStore();
-  await store.set(key, JSON.stringify(value), { contentType: 'application/json' });
+async function putJson(key, obj) {
+  const store = ensureStore();
+  await store.setJSON(key, obj);
 }
 
-export async function getJson(key){
-  const store = await openStore();
-  const res = await store.get(key, { type: 'json' });
-  return res;
+async function getJson(key) {
+  const store = ensureStore();
+  return await store.getJSON(key);
 }
 
-export async function del(key){
-  const store = await openStore();
+async function del(key) {
+  const store = ensureStore();
   await store.delete(key);
 }
 
-export async function list(prefix){
-  const store = await openStore();
-  const out = await store.list({ prefix });
-  return out.blobs?.map(b => b.key) || [];
+async function list(prefix) {
+  const store = ensureStore();
+  const { objects } = await store.list({ prefix });
+  return objects;
 }
+
+module.exports = { ensureStore, putJson, getJson, del, list };
