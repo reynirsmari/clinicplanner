@@ -7,14 +7,10 @@
   <link rel="stylesheet" href="/styles.css">
   <script defer src="/snippets/clinic-actions.js"></script>
   <style>
-    /* Make disabled action buttons visibly gray */
-    .action[disabled]{
-      opacity:.55;
-      cursor:not-allowed;
-      background:#f3f4f6 !important;
-      color:#9ca3af !important;
-      border-color:#e5e7eb !important;
-    }
+    .action[disabled]{opacity:.55;cursor:not-allowed;background:#f3f4f6 !important;color:#9ca3af !important;border-color:#e5e7eb !important}
+    .muted{color:#6b7280}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#eef2ff;color:#1f2937;margin-left:6px}
+    .badge.called{background:#ecfdf5;color:#065f46}
   </style>
 </head>
 <body>
@@ -24,12 +20,14 @@
         <h1>Queue</h1>
         <span class="small" id="updated"></span>
       </div>
+      <div id="empty" class="muted" style="display:none;margin:8px 0 0">No patients in the queue.</div>
       <table class="table" id="table"></table>
     </div>
   </main>
   <script>
   const table = document.getElementById('table');
   const updated = document.getElementById('updated');
+  const emptyBox = document.getElementById('empty');
   const OPEN_KEY = 'clinic_open_rows';
   let open = new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || '[]'));
 
@@ -52,23 +50,31 @@
     </tr>\`;
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
-    list.forEach((t) => {
+
+    if (!Array.isArray(list) || list.length === 0){
+      emptyBox.style.display = 'block';
+      table.style.display = 'none';
+      return;
+    }
+    emptyBox.style.display = 'none';
+    table.style.display = '';
+
+    list.forEach((t, idx) => {
       const tr = document.createElement('tr');
       tr.dataset.id = t.id;
-
-      const isCalled = t.status === 'called';
+      const called = (t.status === 'called' || t.status === 'notified');
+      const pos = t.position || (idx + 1);
       const actions = \`
         <button class="action" data-act="toggle">Details</button>
-        <button class="action" data-act="notify" data-id="\${t.id}" \${isCalled ? 'disabled':''}>\${isCalled ? 'Notified' : 'Notify'}</button>
+        <button class="action" data-act="notify" data-id="\${t.id}" \${called ? 'disabled':''}>\${called ? 'Notified' : 'Notify'}</button>
         <button class="action" data-act="delete" data-id="\${t.id}">Delete</button>
       \`;
-
       tr.innerHTML = \`
-        <td>#\${t.position}</td>
+        <td>#\${pos}</td>
         <td>\${t.name || '—'}</td>
-        <td>\${t.complaint || '—'} \${isCalled ? '<span class="badge">called</span>':''}</td>
-        <td>\${new Date(t.createdAt).toLocaleString()}</td>
-        <td>\${t.id}</td>
+        <td>\${t.complaint || '—'}\${called ? '<span class="badge called">called</span>':''}</td>
+        <td>\${new Date(t.createdAt || Date.now()).toLocaleString()}</td>
+        <td style="font-family:ui-monospace,monospace">\${t.id}</td>
         <td>\${actions}</td>
       \`;
       tbody.appendChild(tr);
@@ -94,14 +100,24 @@
     table.appendChild(tbody);
   }
 
+  function pickListShape(data){
+    // Accepts {ok, items}, {items}, {tickets}, array, or any wrapper with .items/.tickets
+    if (Array.isArray(data)) return data;
+    if (!data || typeof data !== 'object') return [];
+    return data.items || data.tickets || data.list || [];
+  }
+
   async function refresh(){
-    const res = await fetch('/api/tickets-list');
-    const data = await res.json().catch(()=>({}));
-    if (data.ok){
-      draw(data.items);
-      updated.textContent = 'Updated '+new Date().toLocaleTimeString();
-    } else {
+    try{
+      const res = await fetch('/api/tickets-list');
+      const data = await res.json().catch(()=>({}));
+      const list = pickListShape(data);
+      draw(list);
+      updated.textContent = 'Updated ' + new Date().toLocaleTimeString();
+    }catch(e){
       updated.textContent = 'Failed to load queue';
+      table.innerHTML = '';
+      emptyBox.style.display = 'block';
     }
   }
   refresh();
