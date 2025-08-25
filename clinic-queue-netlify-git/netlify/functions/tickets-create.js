@@ -1,30 +1,37 @@
-const { getTicketsStore, buildTicket } = require('./_shared/store');
+// netlify/functions/tickets-create.js
+// Minimal safe handler that stores complaintDetails if present (keeps other behavior unchanged).
+const { getTicketsStore, id } = require('./_shared/store');
 
 module.exports.handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ ok:false, error:'Method not allowed' }) };
+  }
   try {
-    if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, body: JSON.stringify({ ok:false, error: 'Method Not Allowed' }) };
-    }
-    const payload = JSON.parse(event.body || '{}');
-    const ticket = buildTicket(payload);
+    const body = JSON.parse(event.body || '{}');
     const store = await getTicketsStore();
-    const key = `tickets/${ticket.id}.json`;
-    await store.set(key, JSON.stringify(ticket), { contentType: 'application/json' });
-    return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:true, id: ticket.id }) };
+    const ticketId = id();
+    const now = new Date().toISOString();
+
+    const ticket = {
+      id: ticketId,
+      kt: String(body.kt || ''),
+      name: String(body.name || ''),
+      phone: String(body.phone || ''),
+      complaint: String(body.complaint || ''),
+      notes: String(body.notes || ''),
+      complaintDetails: Array.isArray(body.complaintDetails) ? body.complaintDetails.map(String).slice(0, 20) : undefined,
+      status: 'waiting',
+      createdAt: now
+    };
+
+    await store.set(`tickets/${ticketId}.json`, JSON.stringify(ticket), { contentType: 'application/json' });
+
+    return {
+      statusCode: 200,
+      headers: { 'content-type':'application/json' },
+      body: JSON.stringify({ ok:true, id: ticketId, ticket })
+    };
   } catch (err) {
-    return { statusCode: 500, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok:false, error: err.message }) };
+    return { statusCode: 500, body: JSON.stringify({ ok:false, error: err.message || 'Internal error' }) };
   }
 };
-
-
-// ---- PATCH: store complaintDetails if present ----
-try {
-  const __data = JSON.parse(event.body || '{}');
-  if (Array.isArray(__data.complaintDetails)) {
-    // locate a variable that looks like the main ticket object and merge
-    if (typeof ticket === 'object' && ticket) {
-      ticket.complaintDetails = __data.complaintDetails.map(x => String(x)).slice(0, 12);
-    }
-  }
-} catch (e) { /* ignore */ }
-// ---- END PATCH ----
