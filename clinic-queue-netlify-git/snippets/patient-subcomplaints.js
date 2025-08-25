@@ -1,8 +1,7 @@
 /**
  * patient-subcomplaints.js
- * Shows sub-complaint checkboxes after a primary complaint is selected
+ * Renders sub-complaint checkboxes after a primary complaint is selected
  * and appends them to the JSON for /api/tickets-create as `complaintDetails`.
- * No other UI/behavior is changed.
  */
 (() => {
   const SUBS = {
@@ -20,30 +19,30 @@
     "Mental health": ["Anxiety","Low mood","Panic","Stress"]
   };
 
-  function selectEl() {
-    return document.querySelector('#complaint, select[name="complaint"], [data-complaint-select]');
-  }
-  function detailsContainer(afterEl){
+  const sel = () => document.querySelector('#complaint, select[name="complaint"], [data-complaint-select]');
+
+  function container(afterEl){
     let c = document.getElementById('complaint-details');
     if(!c){
       c = document.createElement('div');
       c.id = 'complaint-details';
-      c.style.marginTop = '12px';
       afterEl.insertAdjacentElement('afterend', c);
     }
     return c;
   }
+
   function selectedDetails(){
     return Array.from(document.querySelectorAll('input[name="complaintDetails[]"]:checked')).map(i=>i.value);
   }
+
   function render(complaint){
-    const sel = selectEl();
-    if(!sel) return;
-    const c = detailsContainer(sel);
-    c.innerHTML = '';
+    const s = sel();
+    if(!s) return;
+    const host = container(s);
+    host.innerHTML = '';
     const list = SUBS[complaint];
-    if(!list || !list.length){ c.hidden = true; return; }
-    c.hidden = false;
+    if(!list){ host.hidden = true; return; }
+    host.hidden = false;
 
     const fs = document.createElement('fieldset');
     fs.style.border = '1px solid #e5e7eb';
@@ -64,15 +63,22 @@
     for(const label of list){
       const id = 'sub_'+label.toLowerCase().replace(/[^a-z0-9]+/g,'_');
       const lab = document.createElement('label');
-      lab.style.display = 'flex'; lab.style.alignItems = 'center'; lab.style.gap = '8px';
+      lab.style.display = 'flex';
+      lab.style.alignItems = 'center';
+      lab.style.gap = '8px';
       const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = label; cb.name = 'complaintDetails[]'; cb.id = id;
-      const span = document.createElement('span'); span.textContent = label;
-      lab.appendChild(cb); lab.appendChild(span);
+      cb.type = 'checkbox';
+      cb.value = label;
+      cb.name = 'complaintDetails[]';
+      cb.id = id;
+      const span = document.createElement('span');
+      span.textContent = label;
+      lab.appendChild(cb);
+      lab.appendChild(span);
       grid.appendChild(lab);
     }
     fs.appendChild(grid);
-    c.appendChild(fs);
+    host.appendChild(fs);
   }
 
   function patchFetch(){
@@ -91,8 +97,8 @@
               const det = selectedDetails();
               if(det.length) data.complaintDetails = det;
             }
-            const newInit = { ...(init||{}), body: JSON.stringify(data) };
-            return orig.call(this, url, newInit);
+            const next = { ...(init||{}), body: JSON.stringify(data) };
+            return orig.call(this, url, next);
           }
         }
       }catch{}
@@ -101,13 +107,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    const sel = selectEl();
-    if(!sel) return;
-    render(sel.value);
-    sel.addEventListener('change', ()=> render(sel.value));
+    const s = sel();
+    if(!s) return;
+    if(s.value) render(s.value);
+    s.addEventListener('change', ()=> render(s.value));
     patchFetch();
   });
-
-  // Expose SUBS if needed later
-  window.__PATIENT_SUBS = SUBS;
-})();
+})(); 
