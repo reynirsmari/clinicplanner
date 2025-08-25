@@ -1,211 +1,147 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Clinic Queue</title>
   <style>
-    :root{
-      --bg:#f8fafc; --panel:#ffffff; --text:#0f172a; --muted:#475569; --line:#e2e8f0;
-      --green:#16a34a; --green-weak:#dcfce7; --blue:#3b82f6; --blue-weak:#dbeafe; --red:#ef4444; --red-weak:#fee2e2;
-    }
-    html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;}
-    .wrap{max-width:1200px;margin:32px auto;padding:0 16px}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    h1{font-size:24px;font-weight:700;margin:0 0 16px}
-    table{width:100%;border-collapse:collapse}
-    thead th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1;background:#fff;}
-    tbody td{padding:16px;border-bottom:1px solid var(--line);vertical-align:middle}
-    tbody tr:last-child td{border-bottom-color:transparent}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);font-size:12px}
-    .badge{display:inline-block;padding:.2rem .6rem;border-radius:999px;font-weight:600;font-size:12px}
-    .badge.waiting{background:#f1f5f9;color:#334155;border:1px solid var(--line)}
-    .badge.called{background:var(--green-weak);color:var(--green);border:1px solid #86efac}
-    .btn{border:none;border-radius:10px;padding:.55rem .9rem;font-weight:700;cursor:pointer}
-    .btn:disabled{opacity:.55;cursor:default}
-    .btn.notify{background:var(--blue);color:white}
-    .btn.notified{background:var(--blue-weak);color:#1e40af}
-    .btn.delete{background:var(--red-weak);color:var(--red)}
-    .row{transition:background .15s ease}
-    .row:hover{background:#f8fafc}
-    .small{font-size:12px;color:var(--muted)}
-    .actions{white-space:nowrap}
-    .name{font-weight:700}
+    :root{ --bg:#f7f8fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --line:#e5e7eb; --blue:#2563eb; --red:#dc2626; --green:#16a34a; --pill:#eef2ff; }
+    *{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    body{margin:0;background:var(--bg);color:var(--text);}
+    .wrap{max-width:1100px;margin:32px auto;padding:0 16px;}
+    h1{font-size:28px;margin:0 0 16px 0;font-weight:700;}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 4px 10px rgba(15,23,42,.04)}
+    table{width:100%;border-collapse:collapse;}
+    thead th{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;background:#fff;border-bottom:1px solid var(--line);padding:14px 16px;}
+    tbody td{padding:16px;border-bottom:1px solid var(--line);vertical-align:top;}
+    tbody tr:last-child td{border-bottom:0}
+    .idx{width:52px;color:var(--muted);font-weight:600}
+    .name{font-weight:600;}
+    .muted{color:var(--muted);font-size:12px}
+    .status{display:inline-block;border:1px solid var(--line);padding:6px 10px;border-radius:999px;font-weight:600;font-size:12px}
+    .status.called{color:var(--green);border-color:#bbf7d0;background:#ecfdf5}
+    .status.waiting{color:#92400e;border-color:#fde68a;background:#fffbeb}
+    .status.notified{color:#1d4ed8;border-color:#bfdbfe;background:#eff6ff}
+    .btn{appearance:none;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    .btn:disabled{opacity:.5;cursor:default}
+    .btn.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+    .btn.red{background:#fff;color:var(--red);border-color:#fecaca}
+    .actions{white-space:nowrap;display:flex;gap:10px;align-items:center}
+    td.actions-cell{position:relative;}
+    td.actions-cell::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--line);}
+    tr.in-progress{opacity:.55;}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Queue</h1>
     <div class="card">
-      <table aria-label="Queue">
+      <table id="queue">
         <thead>
           <tr>
-            <th style="width:64px">#</th>
-            <th>Patient</th>
+            <th class="idx">#</th>
+            <th>Name</th>
             <th>Primary complaint</th>
             <th>Created</th>
             <th>Status</th>
-            <th class="actions" style="width:220px">Actions</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr><td colspan="6" class="small" style="padding:20px" id="loading">Loading…</td></tr>
+          <tr><td colspan="6" class="muted" style="padding:24px">Loading…</td></tr>
         </tbody>
       </table>
     </div>
   </div>
-
   <script>
-    const $tbody = document.getElementById('tbody');
-
-    const api = (p)=> `/api/${p}`;
-
-    const expandedKey = 'clinic.expanded';
-    const getExpanded = () => new Set(JSON.parse(localStorage.getItem(expandedKey) || '[]'));
-    const setExpanded = (set) => localStorage.setItem(expandedKey, JSON.stringify([...set]));
-
-    let expanded = getExpanded();
+    const TBody = document.getElementById('tbody');
+    const treatingKey = 'clinic:treating';
+    function getTreating(){ try{return new Set(JSON.parse(localStorage.getItem(treatingKey)||'[]'));}catch{return new Set();} }
+    function setTreating(set){ localStorage.setItem(treatingKey, JSON.stringify([...set])); }
+    let treating = getTreating();
 
     function fmtDate(iso){
-      try{
-        const d = new Date(iso);
-        return new Intl.DateTimeFormat(navigator.language,{ dateStyle:'short', timeStyle:'short'}).format(d);
-      }catch(e){ return iso || '' }
+      try{ const d=new Date(iso);
+        return d.toLocaleDateString(undefined,{day:'2-digit',month:'2-digit',year:'numeric'})+', '+
+               d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+      }catch{return iso||'';}
     }
 
-    async function notify(id, btn){
+    async function fetchList(){
+      const r = await fetch('/api/tickets-list', {cache:'no-store'});
+      const j = await r.json();
+      if(!j.ok) throw new Error(j.error||'Failed to load');
+      return j.items || [];
+    }
+
+    function statusPill(s){
+      const span = document.createElement('span');
+      span.className = 'status ' + (s||'waiting');
+      span.textContent = (s||'waiting').replace(/^./,c=>c.toUpperCase());
+      return span;
+    }
+
+    async function actionNotify(id, btn){
       btn.disabled = true;
-      try{
-        const res = await fetch(api(`tickets-notify?id=${encodeURIComponent(id)}`), {method:'POST'});
-        const data = await res.json();
-        if(!data.ok) throw new Error(data.error || 'Notify failed');
-        btn.classList.remove('notify'); btn.classList.add('notified'); btn.textContent = 'Notified';
-      }catch(err){
-        alert('Failed to notify: ' + err.message);
-        btn.disabled = false;
-      }
+      const r = await fetch('/api/tickets-notify?id='+encodeURIComponent(id), {method:'POST'});
+      const j = await r.json().catch(()=>({ok:false}));
+      if(!j.ok){ alert('Failed to notify'); btn.disabled=false; return; }
+      btn.textContent='Notified'; btn.classList.remove('blue'); btn.disabled=true;
     }
 
-    async function remove(id){
+    async function actionDelete(id){
       if(!confirm('Delete this ticket?')) return;
+      const r = await fetch('/api/tickets-delete?id='+encodeURIComponent(id), {method:'POST'});
+      const j = await r.json().catch(()=>({ok:false}));
+      if(!j.ok){ alert('Failed to delete'); return; }
+      render(); // refresh
+    }
+
+    function openTreat(id){
+      treating.add(id); setTreating(treating);
+      window.open('/clinic/treat.html?id='+encodeURIComponent(id), '_blank');
+      [...document.querySelectorAll('tr[data-id="'+id+'"]')].forEach(tr=>tr.classList.add('in-progress'));
+    }
+
+    function escapeHtml(s){ return (s??'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function rowHtml(item, idx){
+      const position = (item.position ?? (idx+1));
+      const notified = !!item.notifiedAt || item.status === 'called';
+      return `
+        <tr class="row ${treating.has(item.id)?'in-progress':''}" data-id="${item.id}">
+          <td class="idx">${position||''}</td>
+          <td class="name">
+            ${escapeHtml(item.name||'—')}
+            <div class="muted">ID: ${escapeHtml(item.id||'')}</div>
+          </td>
+          <td>${escapeHtml(item.complaint||'—')}</td>
+          <td>${fmtDate(item.createdAt)}</td>
+          <td>${statusPill(item.status||'waiting').outerHTML}</td>
+          <td class="actions-cell">
+            <div class="actions">
+              <button class="btn" onclick="openTreat('${item.id}')">Treat patient</button>
+              <button class="btn blue" onclick="actionNotify('${item.id}', this)" ${notified?'disabled':''}>${notified?'Notified':'Notify'}</button>
+              <button class="btn red" onclick="actionDelete('${item.id}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+    }
+
+    async function render(){
+      TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px">Loading…</td></tr>';
       try{
-        const res = await fetch(api(`tickets-delete?id=${encodeURIComponent(id)}`), {method:'POST'});
-        const data = await res.json();
-        if(!data.ok) throw new Error(data.error || 'Delete failed');
-        await load();
-      }catch(err){
-        alert('Failed to delete: ' + err.message);
+        const items = await fetchList();
+        items.sort((a,b)=> (a.position??999)-(b.position??999) || new Date(a.createdAt)-new Date(b.createdAt));
+        if(!items.length){ TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px">No patients in queue.</td></tr>'; return; }
+        TBody.innerHTML = items.map(rowHtml).join('');
+      }catch(e){
+        TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px;color:#b91c1c">Failed to load queue.</td></tr>';
       }
     }
 
-    function render(items){
-      $tbody.innerHTML = '';
-      if(!Array.isArray(items) || items.length === 0){
-        $tbody.innerHTML = '<tr><td colspan="6" class="small" style="padding:20px">No patients in queue.</td></tr>';
-        return;
-      }
-
-      items.sort((a,b)=> (a.position ?? 9999) - (b.position ?? 9999) || new Date(a.createdAt)-new Date(b.createdAt));
-
-      for(const t of items){
-        const tr = document.createElement('tr');
-        tr.className = 'row';
-        tr.dataset.id = t.id;
-
-        const tdPos = document.createElement('td');
-        tdPos.textContent = t.position ?? '';
-        tdPos.className = 'small';
-        tr.appendChild(tdPos);
-
-        const tdName = document.createElement('td');
-        tdName.innerHTML = `<div class="name">${escapeHtml(t.name || '')}</div>
-                            <div class="mono">ID: ${escapeHtml(t.id || '')}</div>`;
-        tr.appendChild(tdName);
-
-        const tdComplaint = document.createElement('td');
-        tdComplaint.textContent = t.complaint || '';
-        tr.appendChild(tdComplaint);
-
-        const tdCreated = document.createElement('td');
-        tdCreated.textContent = fmtDate(t.createdAt);
-        tr.appendChild(tdCreated);
-
-        const tdStatus = document.createElement('td');
-        const status = (t.status || 'waiting').toLowerCase();
-        const badgeClass = status === 'called' ? 'called' : 'waiting';
-        const label = status === 'called' ? 'Called' : 'Waiting';
-        tdStatus.innerHTML = `<span class="badge ${badgeClass}">${label}</span>`;
-        tr.appendChild(tdStatus);
-
-        const tdActions = document.createElement('td');
-        tdActions.className = 'actions';
-
-        const btnNotify = document.createElement('button');
-        const already = !!t.notifiedAt || status === 'called';
-        btnNotify.className = 'btn ' + (already ? 'notified' : 'notify');
-        btnNotify.textContent = already ? 'Notified' : 'Notify';
-        btnNotify.disabled = already;
-        btnNotify.addEventListener('click', (e)=>{ e.stopPropagation(); notify(t.id, btnNotify); });
-
-        const btnDelete = document.createElement('button');
-        btnDelete.className = 'btn delete';
-        btnDelete.style.marginLeft = '10px';
-        btnDelete.textContent = 'Delete';
-        btnDelete.addEventListener('click', (e)=>{ e.stopPropagation(); remove(t.id); });
-
-        tdActions.appendChild(btnNotify);
-        tdActions.appendChild(btnDelete);
-        tr.appendChild(tdActions);
-
-        tr.addEventListener('click', ()=>{
-          if(tr.nextSibling && tr.nextSibling.classList && tr.nextSibling.classList.contains('details')){
-            tr.nextSibling.remove();
-            expanded.delete(t.id); setExpanded(expanded);
-          }else{
-            const dtr = document.createElement('tr');
-            dtr.className = 'details';
-            const dtd = document.createElement('td');
-            dtd.colSpan = 6;
-            dtd.style.background = '#fafafa';
-            dtd.style.borderBottom = '1px solid var(--line)';
-            dtd.style.padding = '14px 16px';
-            dtd.innerHTML = `
-              <div class="small"><strong>SSN:</strong> ${escapeHtml(t.kt || '')} &nbsp;&nbsp;
-              <strong>Phone:</strong> ${escapeHtml(t.phone || '')}</div>
-              <div class="small" style="margin-top:6px"><strong>Notes:</strong> ${escapeHtml(t.notes || '')}</div>`;
-            dtr.appendChild(dtd);
-            tr.after(dtr);
-            expanded.add(t.id); setExpanded(expanded);
-          }
-        });
-
-        $tbody.appendChild(tr);
-
-        if(expanded.has(t.id)){
-          tr.click();
-        }
-      }
-    }
-
-    function escapeHtml(s){
-      return String(s ?? '').replace(/[&<>"']/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-    }
-
-    async function load(){
-      try{
-        const res = await fetch(api('tickets-list'), {cache:'no-store'});
-        const data = await res.json();
-        const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
-        render(items);
-      }catch(err){
-        $tbody.innerHTML = '<tr><td colspan="6" class="small" style="padding:20px;color:#b91c1c">Failed to load queue.</td></tr>';
-      }
-    }
-
-    load();
-    setInterval(load, 10000);
+    render();
+    setInterval(render, 10000);
   </script>
 </body>
 </html>
