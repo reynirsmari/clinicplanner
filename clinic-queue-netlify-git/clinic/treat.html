@@ -32,6 +32,7 @@
         <div class="field"><div class="label">Kennitala</div><div id="kt" class="value">—</div></div>
         <div class="field"><div class="label">Phone</div><div id="phone" class="value">—</div></div>
         <div class="field"><div class="label">Primary complaint</div><div id="complaint" class="value">—</div></div>
+        <div class="field"><div class="label">Complaint details</div><div id="complaintDetails" class="value">—</div></div>
         <div class="field" style="grid-column:1/3"><div class="label">Patient notes</div><div id="notes" class="value">—</div></div>
       </div>
 
@@ -72,6 +73,9 @@
         document.getElementById('phone').textContent = t.phone || '—';
         document.getElementById('complaint').textContent = t.complaint || '—';
         document.getElementById('notes').textContent = t.notes || '—';
+        const det = Array.isArray(t.complaintDetails) ? t.complaintDetails.filter(Boolean) : [];
+        document.getElementById('complaintDetails').textContent = det.length ? det.join(', ') : '—';
+
         try{
           const saved = localStorage.getItem(noteKey(id));
           if(saved) document.getElementById('docnotes').value = saved;
