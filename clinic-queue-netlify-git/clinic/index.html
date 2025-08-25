@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Clinic Queue</title>
   <style>
-    :root{ --bg:#f7f8fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --line:#e5e7eb; --blue:#2563eb; --red:#dc2626; --green:#16a34a; --pill:#eef2ff; }
+    :root{ --bg:#f7f8fb; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --line:#e5e7eb; --blue:#2563eb; --red:#dc2626; --green:#16a34a; }
     *{box-sizing:border-box;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     body{margin:0;background:var(--bg);color:var(--text);}
     .wrap{max-width:1100px;margin:32px auto;padding:0 16px;}
@@ -30,15 +30,15 @@
     td.actions-cell{position:relative;}
     td.actions-cell::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--line);}
     tr.in-progress{opacity:.55;transition:opacity .15s ease;}
-    /* tiny syncing dot (no layout shift) */
-    .sync{position:sticky; top:0; float:right; font-size:10px; color:#94a3b8; padding:6px 8px;}
-    .sync .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#94a3b8;margin-left:6px;animation:pulse 1.4s infinite;}
-    @keyframes pulse{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
+    /* Drag & drop */
+    tr.row[draggable="true"]{}
+    tr.row.dragging{opacity:.35; background:#f1f5f9}
+    tr.row.drop-target{outline:2px dashed #cbd5e1; outline-offset:-6px}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Queue <span id="sync" class="sync" aria-live="polite" aria-atomic="true" style="display:none">Syncing<span class="dot"></span></span></h1>
+    <h1>Queue</h1>
     <div class="card">
       <table id="queue">
         <thead>
@@ -59,7 +59,6 @@
   </div>
   <script>
     const TBody = document.getElementById('tbody');
-    const Sync = document.getElementById('sync');
     const treatingKey = 'clinic:treating';
     const channelName = 'clinic-queue-sync';
     let firstLoad = true;
@@ -102,14 +101,13 @@
       const r = await fetch('/api/tickets-delete?id='+encodeURIComponent(id), {method:'POST'});
       const j = await r.json().catch(()=>({ok:false}));
       if(!j.ok){ alert('Failed to delete'); return; }
-      render(false); // refresh without loading screen
+      render(false);
     }
 
     function openTreat(id){
       treating.add(id); setTreating(treating);
       try{ new BroadcastChannel(channelName).postMessage({type:'treating-updated', id}); }catch{}
       window.open('/clinic/treat.html?id='+encodeURIComponent(id), '_blank');
-      // update visuals immediately
       document.querySelectorAll(`tr[data-id="${id}"]`).forEach(tr=>tr.classList.add('in-progress'));
     }
 
@@ -119,7 +117,7 @@
       const position = (item.position ?? (idx+1));
       const notified = !!item.notifiedAt || item.status === 'called';
       return `
-        <tr class="row ${treating.has(item.id)?'in-progress':''}" data-id="${item.id}">
+        <tr class="row ${treating.has(item.id)?'in-progress':''}" data-id="${item.id}" draggable="true">
           <td class="idx">${position||''}</td>
           <td class="name">
             ${escapeHtml(item.name||'—')}
@@ -140,20 +138,80 @@
 
     async function render(showLoading = firstLoad){
       try{
-        if(showLoading && firstLoad){ /* show initial "Loading…" (already in DOM) */ }
-        else { Sync.style.display='inline'; }
         const items = await fetchList();
         items.sort((a,b)=> (a.position??999)-(b.position??999) || new Date(a.createdAt)-new Date(b.createdAt));
-        // Replace rows without inserting a loading row to avoid blink
         TBody.innerHTML = items.length ? items.map(rowHtml).join('') :
           '<tr><td colspan="6" class="muted" style="padding:24px">No patients in queue.</td></tr>';
+        attachDnd();
       }catch(e){
         if(firstLoad) {
           TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px;color:#b91c1c">Failed to load queue.</td></tr>';
         }
       }finally{
         firstLoad = false;
-        Sync.style.display='none';
+      }
+    }
+
+    function attachDnd(){
+      let dragEl = null;
+      let overEl = null;
+
+      TBody.querySelectorAll('tr.row').forEach(tr=>{
+        tr.addEventListener('dragstart', (e)=>{
+          dragEl = tr;
+          tr.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', tr.dataset.id); } catch {}
+        });
+        tr.addEventListener('dragend', ()=>{
+          if(dragEl) dragEl.classList.remove('dragging');
+          if(overEl) overEl.classList.remove('drop-target');
+          dragEl = null; overEl = null;
+          renumber();
+          saveOrder();
+        });
+      });
+
+      TBody.addEventListener('dragover', (e)=>{
+        e.preventDefault();
+        const target = e.target.closest('tr.row');
+        if(!target || target === dragEl) return;
+        overEl && overEl.classList.remove('drop-target');
+        overEl = target;
+        overEl.classList.add('drop-target');
+
+        const rect = target.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < rect.height / 2;
+        if(before){
+          TBody.insertBefore(dragEl, target);
+        }else{
+          TBody.insertBefore(dragEl, target.nextSibling);
+        }
+      });
+
+      TBody.addEventListener('drop', (e)=>{ e.preventDefault(); });
+    }
+
+    function renumber(){
+      let i=1;
+      TBody.querySelectorAll('tr.row').forEach(tr=>{
+        const td = tr.querySelector('td.idx');
+        if(td) td.textContent = i++;
+      });
+    }
+
+    async function saveOrder(){
+      const ids = [...TBody.querySelectorAll('tr.row')].map(tr=>tr.dataset.id);
+      try{
+        const r = await fetch('/api/tickets-reorder', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ order: ids })
+        });
+        const j = await r.json();
+        if(!j.ok){ throw new Error(j.error || 'Save failed'); }
+      }catch(e){
+        alert('Failed to save order: ' + e.message);
       }
     }
 
