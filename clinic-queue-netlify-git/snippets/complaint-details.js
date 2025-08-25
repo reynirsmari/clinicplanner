@@ -1,104 +1,155 @@
-// /snippets/complaint-details.js
-// Adds dynamic sub-category checkboxes under the primary complaint selector
-// and includes them in the payload sent to /api/tickets-create as `complaintDetails`.
-(function () {
-  'use strict';
-  const MAP = {
-    "Respiratory": ["Cough","Shortness of breath","Sore throat","Runny/blocked nose","Fever/chills"],
-    "Gastrointestinal": ["Nausea","Vomiting","Diarrhea","Abdominal pain","Heartburn"],
-    "Neurological": ["Headache","Dizziness","Weakness","Numbness/tingling","Confusion"],
-    "Dermatological": ["Rash","Itching","Wound","Infection","Allergic reaction"],
-    "Musculoskeletal": ["Back pain","Joint pain","Muscle pain","Injury/trauma","Swelling"],
-    "Cardiovascular": ["Chest pain","Palpitations","Leg swelling","Fainting/near-fainting"],
-    "ENT": ["Ear pain","Hearing loss","Nose bleed","Sinus pain/pressure"],
-    "Ophthalmology": ["Eye pain","Red eye","Vision changes","Discharge"],
-    "Urology": ["Painful urination","Frequency/urgency","Blood in urine","Flank pain"],
-    "Gynecology": ["Vaginal bleeding","Pelvic pain","Pregnancy related","Discharge/itching"],
-    "General": ["Fever","Fatigue","Weight loss","Night sweats"]
+/* Sub-complaints helper for Check-in
+   - Shows context options after a primary complaint is selected
+   - Quietly appends `complaintDetails` to the POST body for /api/tickets-create
+   - Keeps existing UI/flow intact
+*/
+(() => {
+  const SUBS = {
+    "Respiratory": [
+      "Cough","Shortness of breath","Sore throat","Runny nose","Fever","Wheezing","Chest discomfort"
+    ],
+    "Gastrointestinal": [
+      "Abdominal pain","Nausea","Vomiting","Diarrhea","Constipation","Heartburn","Blood in stool"
+    ],
+    "Dermatological": [
+      "Rash","Itching","Hives","Wound","Infection","Eczema flare","Psoriasis flare"
+    ],
+    "Musculoskeletal": [
+      "Back pain","Neck pain","Joint pain","Sprain/strain","Swelling","Injury/trauma"
+    ],
+    "Neurological": [
+      "Headache","Dizziness","Numbness or tingling","Weakness","Migraine","Seizure"
+    ],
+    "ENT": [
+      "Ear pain","Hearing changes","Sinus pain/pressure","Sore throat","Nasal congestion"
+    ],
+    "Ophthalmologic": [
+      "Red eye","Eye pain","Discharge","Vision changes","Injury/foreign body"
+    ],
+    "Urologic": [
+      "Painful urination","Urgency/frequency","Blood in urine","Flank pain"
+    ],
+    "Gynecologic": [
+      "Pelvic pain","Vaginal bleeding","Discharge","Pregnancy concern"
+    ],
+    "Cardiovascular": [
+      "Chest pain","Palpitations","Leg swelling"
+    ],
+    "General": [
+      "Fever","Fatigue","Chills","Night sweats"
+    ],
+    "Mental health": [
+      "Anxiety","Low mood","Panic","Stress"
+    ]
   };
 
-  function $(sel,root){return (root||document).querySelector(sel);}
-  function $all(sel,root){return Array.from((root||document).querySelectorAll(sel));}
-  function el(tag, attrs={}, children=[]) {
-    const n = document.createElement(tag);
-    for (const [k,v] of Object.entries(attrs)) {
-      if (k==='class') n.className = v;
-      else if (k==='for') n.htmlFor = v;
-      else n.setAttribute(k,v);
-    }
-    for (const c of [].concat(children)) {
-      if (typeof c === 'string') n.appendChild(document.createTextNode(c)); else if (c) n.appendChild(c);
-    }
-    return n;
+  function $(sel){ return document.querySelector(sel); }
+  function findComplaintSelect() {
+    return document.querySelector('#complaint, select[name="complaint"], [data-complaint-select]');
   }
 
-  function ensureStyles() {
-    if ($('#complaint-details-style')) return;
-    const css = `
-      #complaint-details { display:none; margin-top: .75rem; padding:.75rem; border:1px solid rgba(0,0,0,.08); border-radius:.5rem; background:rgba(0,0,0,.02); }
-      #complaint-details.active { display:block; }
-      #complaint-details h4 { margin:0 0 .5rem 0; font-size: .95rem; font-weight:600; }
-      #complaint-details .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:.5rem .75rem; }
-      #complaint-details label { display:flex; align-items:center; gap:.5rem; font-size:.95rem; }
-      #complaint-details input[type="checkbox"] { transform: scale(1.1); }
-    `;
-    document.head.appendChild(el('style',{id:'complaint-details-style'},[css]));
-  }
-
-  function mountUI(selectEl) {
-    ensureStyles();
-    let box = $('#complaint-details');
-    if (!box) {
-      box = el('div',{id:'complaint-details'});
-      selectEl.parentElement.insertAdjacentElement('afterend', box);
+  function ensureContainer(afterEl) {
+    let c = document.getElementById('complaint-details');
+    if (!c) {
+      c = document.createElement('div');
+      c.id = 'complaint-details';
+      c.style.marginTop = '12px';
+      afterEl.insertAdjacentElement('afterend', c);
     }
-    function render() {
-      const val = selectEl.value;
-      box.innerHTML = '';
-      if (!val || !MAP[val]) { box.classList.remove('active'); return; }
-      const opts = MAP[val];
-      const grid = el('div',{class:'grid'}, opts.map((txt,i)=>{
-        const id = `sub_${val.replace(/\s+/g,'_').toLowerCase()}_${i}`;
-        return el('label',{'for':id},[el('input',{type:'checkbox',value:txt,id}), txt]);
-      }));
-      box.appendChild(el('h4',{},[`Select relevant details (${val})`]));
-      box.appendChild(grid);
-      box.classList.add('active');
-    }
-    selectEl.addEventListener('change', render);
-    render();
-    return box;
+    return c;
   }
 
-  function getChecked(box){
-    return $all('input[type="checkbox"]:checked', box).map(i=>i.value);
+  function render(complaint) {
+    const select = findComplaintSelect();
+    if (!select) return;
+    const container = ensureContainer(select);
+    container.innerHTML = '';
+
+    const list = SUBS[complaint];
+    if (!list || !list.length) { container.hidden = true; return; }
+    container.hidden = false;
+
+    const fs = document.createElement('fieldset');
+    fs.style.border = 'none';
+    fs.style.padding = '0';
+    fs.style.margin = '0';
+
+    const lg = document.createElement('legend');
+    lg.textContent = 'Details (optional)';
+    lg.style.fontSize = '0.95rem';
+    lg.style.margin = '6px 0';
+    fs.appendChild(lg);
+
+    const wrap = document.createElement('div');
+    wrap.style.display = 'grid';
+    wrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(180px, 1fr))';
+    wrap.style.gap = '8px 12px';
+
+    list.forEach(label => {
+      const id = 'sub_'+label.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+      const lab = document.createElement('label');
+      lab.style.display = 'flex';
+      lab.style.alignItems = 'center';
+      lab.style.gap = '8px';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = label;
+      cb.name = 'complaintDetails[]';
+      cb.id = id;
+
+      const span = document.createElement('span');
+      span.textContent = label;
+
+      lab.appendChild(cb);
+      lab.appendChild(span);
+      wrap.appendChild(lab);
+    });
+
+    fs.appendChild(wrap);
+    container.appendChild(fs);
   }
 
-  function intercept() {
+  function selectedDetails() {
+    return Array.from(document.querySelectorAll('input[name="complaintDetails[]"]:checked'))
+                .map(i => i.value);
+  }
+
+  function patchFetchOnce() {
+    if (window.__complaintFetchPatched) return;
+    window.__complaintFetchPatched = true;
+
     const orig = window.fetch;
     window.fetch = function(input, init) {
       try {
-        const url = typeof input === 'string' ? input : (input && input.url) || '';
-        if (url.includes('/api/tickets-create') && init && init.method && init.method.toUpperCase()==='POST' && init.body) {
-          const box = $('#complaint-details');
-          if (box) {
-            const chosen = getChecked(box);
-            if (chosen.length) {
-              const data = JSON.parse(init.body);
-              data.complaintDetails = chosen;
-              init.body = JSON.stringify(data);
+        const url = typeof input === 'string' ? input : input.url;
+        const method = (init?.method || (typeof input !== 'string' && input.method) || 'GET').toUpperCase();
+        const isCreate = /\/tickets-create(?:\?|$)/.test(url);
+        if (isCreate && method === 'POST') {
+          let bodyText = init?.body || (typeof input !== 'string' ? input.body : null);
+          if (typeof bodyText === 'string' && bodyText.trim().startsWith('{')) {
+            const data = JSON.parse(bodyText);
+            if (!Array.isArray(data.complaintDetails)) {
+              const det = selectedDetails();
+              if (det.length) data.complaintDetails = det;
             }
+            const copyInit = { ...(init || {}), body: JSON.stringify(data) };
+            return orig.call(this, url, copyInit);
           }
         }
-      } catch (e) { /* ignore */ }
-      return orig.apply(this, arguments);
+      } catch (e) { /* swallow */ }
+      return orig.call(this, input, init);
     };
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    const select = $('#complaint, select[name="complaint"]');
-    if (!select) return;
-    const box = mountUI(select);
-    intercept();
+    const sel = findComplaintSelect();
+    if (!sel) return;
+    render(sel.value);
+    sel.addEventListener('change', () => render(sel.value));
+    patchFetchOnce();
   });
+
+  // expose map for possible future UI
+  window.__SUB_COMPLAINTS = SUBS;
 })();
