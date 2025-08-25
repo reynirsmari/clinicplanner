@@ -29,12 +29,16 @@
     .actions{white-space:nowrap;display:flex;gap:10px;align-items:center}
     td.actions-cell{position:relative;}
     td.actions-cell::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--line);}
-    tr.in-progress{opacity:.55;}
+    tr.in-progress{opacity:.55;transition:opacity .15s ease;}
+    /* tiny syncing dot (no layout shift) */
+    .sync{position:sticky; top:0; float:right; font-size:10px; color:#94a3b8; padding:6px 8px;}
+    .sync .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#94a3b8;margin-left:6px;animation:pulse 1.4s infinite;}
+    @keyframes pulse{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Queue</h1>
+    <h1>Queue <span id="sync" class="sync" aria-live="polite" aria-atomic="true" style="display:none">Syncing<span class="dot"></span></span></h1>
     <div class="card">
       <table id="queue">
         <thead>
@@ -55,7 +59,11 @@
   </div>
   <script>
     const TBody = document.getElementById('tbody');
+    const Sync = document.getElementById('sync');
     const treatingKey = 'clinic:treating';
+    const channelName = 'clinic-queue-sync';
+    let firstLoad = true;
+
     function getTreating(){ try{return new Set(JSON.parse(localStorage.getItem(treatingKey)||'[]'));}catch{return new Set();} }
     function setTreating(set){ localStorage.setItem(treatingKey, JSON.stringify([...set])); }
     let treating = getTreating();
@@ -94,13 +102,15 @@
       const r = await fetch('/api/tickets-delete?id='+encodeURIComponent(id), {method:'POST'});
       const j = await r.json().catch(()=>({ok:false}));
       if(!j.ok){ alert('Failed to delete'); return; }
-      render(); // refresh
+      render(false); // refresh without loading screen
     }
 
     function openTreat(id){
       treating.add(id); setTreating(treating);
+      try{ new BroadcastChannel(channelName).postMessage({type:'treating-updated', id}); }catch{}
       window.open('/clinic/treat.html?id='+encodeURIComponent(id), '_blank');
-      [...document.querySelectorAll('tr[data-id="'+id+'"]')].forEach(tr=>tr.classList.add('in-progress'));
+      // update visuals immediately
+      document.querySelectorAll(`tr[data-id="${id}"]`).forEach(tr=>tr.classList.add('in-progress'));
     }
 
     function escapeHtml(s){ return (s??'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -128,20 +138,50 @@
         </tr>`;
     }
 
-    async function render(){
-      TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px">Loading…</td></tr>';
+    async function render(showLoading = firstLoad){
       try{
+        if(showLoading && firstLoad){ /* show initial "Loading…" (already in DOM) */ }
+        else { Sync.style.display='inline'; }
         const items = await fetchList();
         items.sort((a,b)=> (a.position??999)-(b.position??999) || new Date(a.createdAt)-new Date(b.createdAt));
-        if(!items.length){ TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px">No patients in queue.</td></tr>'; return; }
-        TBody.innerHTML = items.map(rowHtml).join('');
+        // Replace rows without inserting a loading row to avoid blink
+        TBody.innerHTML = items.length ? items.map(rowHtml).join('') :
+          '<tr><td colspan="6" class="muted" style="padding:24px">No patients in queue.</td></tr>';
       }catch(e){
-        TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px;color:#b91c1c">Failed to load queue.</td></tr>';
+        if(firstLoad) {
+          TBody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px;color:#b91c1c">Failed to load queue.</td></tr>';
+        }
+      }finally{
+        firstLoad = false;
+        Sync.style.display='none';
       }
     }
 
-    render();
-    setInterval(render, 10000);
+    // Listen for cross-tab updates (Return patient to queue)
+    window.addEventListener('storage', (e)=>{
+      if(e.key === treatingKey){
+        treating = getTreating();
+        document.querySelectorAll('tr[data-id]').forEach(tr=>{
+          const id = tr.dataset.id;
+          tr.classList.toggle('in-progress', treating.has(id));
+        });
+      }
+    });
+    try{
+      const bc = new BroadcastChannel(channelName);
+      bc.onmessage = (ev)=>{
+        if(ev?.data?.type === 'treating-updated'){
+          treating = getTreating();
+          document.querySelectorAll('tr[data-id]').forEach(tr=>{
+            const id = tr.dataset.id;
+            tr.classList.toggle('in-progress', treating.has(id));
+          });
+        }
+      };
+    }catch{}
+
+    render(true);
+    setInterval(()=>render(false), 10000);
   </script>
 </body>
 </html>

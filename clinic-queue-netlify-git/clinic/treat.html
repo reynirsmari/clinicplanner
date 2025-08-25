@@ -50,8 +50,10 @@
   <script>
     const qs = new URLSearchParams(location.search);
     const id = qs.get('id');
+
     const treatingKey = 'clinic:treating';
     const noteKey = (id)=> 'docnote:'+id;
+    const channelName = 'clinic-queue-sync';
 
     function getTreating(){ try{return new Set(JSON.parse(localStorage.getItem(treatingKey)||'[]'));}catch{return new Set();} }
     function setTreating(set){ localStorage.setItem(treatingKey, JSON.stringify([...set])); }
@@ -93,6 +95,7 @@
     document.getElementById('returnBtn').addEventListener('click', ()=>{
       const set = getTreating();
       set.delete(id); setTreating(set);
+      try{ new BroadcastChannel(channelName).postMessage({type:'treating-updated', id}); }catch{}
       alert('Patient returned to queue.');
     });
 
