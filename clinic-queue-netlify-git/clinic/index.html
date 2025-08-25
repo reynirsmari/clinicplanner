@@ -44,7 +44,7 @@
         <thead>
           <tr>
             <th class="idx">#</th>
-            <th>Patient</th>  <!-- restored header label -->
+            <th>Name</th>
             <th>Primary complaint</th>
             <th>Created</th>
             <th>Status</th>
@@ -215,6 +215,7 @@
       }
     }
 
+    // Listen for cross-tab updates (Return patient to queue)
     window.addEventListener('storage', (e)=>{
       if(e.key === treatingKey){
         treating = getTreating();
