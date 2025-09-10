@@ -1,15 +1,27 @@
-
 /**
  * patient-subcomplaints.js
- * Drop-in: shows sub-complaint checkboxes once a primary complaint is selected
- * and sends them as `complaintDetails` with /api/tickets-create.
+ * Renders sub-complaint checkboxes after a primary complaint is selected
+ * and appends them to the JSON for /api/tickets-create as `complaintDetails`.
  */
 (() => {
-  const SUBS = {"Respiratory": ["Cough", "Shortness of breath", "Sore throat", "Runny nose", "Fever", "Wheezing", "Chest tightness", "Chest pain with breathing", "Hoarseness", "Loss of smell", "Sinus pressure", "Post-nasal drip", "Night cough", "Productive cough", "Dry cough"], "Gastrointestinal": ["Abdominal pain", "Nausea", "Vomiting", "Diarrhea", "Constipation", "Heartburn", "Bloating", "Gas", "Loss of appetite", "Blood in stool", "Black stool", "Reflux after meals", "Upper abdominal pain", "Lower abdominal pain", "Weight loss"], "Dermatological": ["Rash", "Itching", "Hives", "Wound", "Infection", "Redness", "Swelling", "Blistering", "Dry skin", "Cracked skin", "Scaling", "Weeping lesion", "Painful lesion", "Acne breakout", "Eczema flare"], "Musculoskeletal": ["Back pain", "Neck pain", "Joint pain", "Muscle pain", "Sprain/strain", "Swelling", "Stiffness", "Limited range of motion", "Knee pain", "Shoulder pain", "Hip pain", "Ankle pain", "Injury/trauma", "Spasm", "Tingling in limbs"], "Neurological": ["Headache", "Migraine", "Dizziness", "Vertigo", "Numbness", "Tingling", "Weakness", "Memory issues", "Confusion", "Speech difficulty", "Vision disturbance", "Balance problems", "Tremor", "Seizure", "Face droop"], "ENT": ["Ear pain", "Hearing changes", "Tinnitus", "Sinus pain/pressure", "Sore throat", "Tonsil pain", "Nasal congestion", "Runny nose", "Post-nasal drip", "Hoarseness", "Difficulty swallowing", "Mouth ulcers", "Tooth pain", "Jaw pain", "Facial pain"], "Ophthalmologic": ["Red eye", "Eye pain", "Discharge", "Itchy eyes", "Tearing", "Light sensitivity", "Blurred vision", "Double vision", "Foreign body sensation", "Vision loss", "Floaters", "Flashes of light", "Eyelid swelling", "Stye", "Chemical exposure"], "Urologic": ["Painful urination", "Urgency", "Frequency", "Blood in urine", "Cloudy urine", "Foul-smelling urine", "Flank pain", "Lower abdominal pain", "Incontinence", "Nocturia", "Weak stream", "Dribbling", "Incomplete emptying", "Kidney stone history", "Testicular pain"], "Gynecologic": ["Pelvic pain", "Vaginal bleeding", "Spotting", "Discharge", "Itching", "Odor", "Painful intercourse", "Missed period", "Cramping", "Pregnancy concern", "Breast pain", "Breast lump", "Postpartum concern", "Hot flashes", "IUD concern"], "Cardiovascular": ["Chest pain", "Palpitations", "Shortness of breath on exertion", "Leg swelling", "Dizziness", "Fainting", "Rapid heartbeat", "Slow heartbeat", "High blood pressure reading", "Low blood pressure symptoms", "Exercise intolerance", "Claudication", "Orthopnea", "PND (night breathlessness)", "Family history concern"], "General": ["Fever", "Fatigue", "Chills", "Night sweats", "Unexplained weight loss", "Poor appetite", "Dehydration", "Heat intolerance", "Cold intolerance", "Generalized pain", "Sleep disturbance", "Jet lag", "Medication question", "Allergic reaction", "Travel-related illness"], "Mental health": ["Anxiety", "Panic", "Low mood", "Irritability", "Stress", "Insomnia", "Poor concentration", "Loss of interest", "Appetite change", "Suicidal thoughts", "Self-harm thoughts", "Mania symptoms", "Substance use concern", "Grief", "Work burnout"]};
+  const SUBS = {
+    "Respiratory": ["Cough","Shortness of breath","Sore throat","Runny nose","Fever","Wheezing","Chest discomfort"],
+    "Gastrointestinal": ["Abdominal pain","Nausea","Vomiting","Diarrhea","Constipation","Heartburn","Blood in stool"],
+    "Dermatological": ["Rash","Itching","Hives","Wound","Infection","Eczema flare","Psoriasis flare"],
+    "Musculoskeletal": ["Back pain","Neck pain","Joint pain","Sprain/strain","Swelling","Injury/trauma"],
+    "Neurological": ["Headache","Dizziness","Numbness or tingling","Weakness","Migraine","Seizure"],
+    "ENT": ["Ear pain","Hearing changes","Sinus pain/pressure","Sore throat","Nasal congestion"],
+    "Ophthalmologic": ["Red eye","Eye pain","Discharge","Vision changes","Injury/foreign body"],
+    "Urologic": ["Painful urination","Urgency/frequency","Blood in urine","Flank pain"],
+    "Gynecologic": ["Pelvic pain","Vaginal bleeding","Discharge","Pregnancy concern"],
+    "Cardiovascular": ["Chest pain","Palpitations","Leg swelling"],
+    "General": ["Fever","Fatigue","Chills","Night sweats"],
+    "Mental health": ["Anxiety","Low mood","Panic","Stress"]
+  };
 
-  const select = () => document.querySelector('#complaint, select[name="complaint"], [data-complaint-select]');
+  const sel = () => document.querySelector('#complaint, select[name="complaint"], [data-complaint-select]');
 
-  function host(afterEl){
+  function container(afterEl){
     let c = document.getElementById('complaint-details');
     if(!c){
       c = document.createElement('div');
@@ -19,18 +31,18 @@
     return c;
   }
 
-  function selected(){
+  function selectedDetails(){
     return Array.from(document.querySelectorAll('input[name="complaintDetails[]"]:checked')).map(i=>i.value);
   }
 
   function render(complaint){
-    const s = select();
+    const s = sel();
     if(!s) return;
-    const h = host(s);
-    h.innerHTML = '';
+    const host = container(s);
+    host.innerHTML = '';
     const list = SUBS[complaint];
-    if(!list){ h.hidden = true; return; }
-    h.hidden = false;
+    if(!list){ host.hidden = true; return; }
+    host.hidden = false;
 
     const fs = document.createElement('fieldset');
     fs.style.border = '1px solid #e5e7eb';
@@ -66,26 +78,12 @@
       grid.appendChild(lab);
     }
     fs.appendChild(grid);
-    h.appendChild(fs);
+    host.appendChild(fs);
   }
 
-  function patchSubmit(){
-    const form = document.querySelector('form#form, form[data-ticket-form], form');
-    if(!form) return;
-    form.addEventListener('submit', (e)=>{
-      try{
-        // If fetch is used later, this ensures payload has complaintDetails
-        const det = selected();
-        if(det.length){
-          const hidden = document.getElementById('complaintDetailsHidden') || Object.assign(document.createElement('input'), {type:'hidden', id:'complaintDetailsHidden', name:'complaintDetails'});
-          hidden.value = JSON.stringify(det);
-          form.appendChild(hidden);
-        }
-      }catch{}
-    }, true);
-    // Patch window.fetch to merge complaintDetails into JSON bodies sent to /tickets-create
-    if(window.__subComplaintsFetchPatched) return;
-    window.__subComplaintsFetchPatched = true;
+  function patchFetch(){
+    if(window.__subComplaintsPatched) return;
+    window.__subComplaintsPatched = true;
     const orig = window.fetch;
     window.fetch = function(input, init){
       try{
@@ -96,7 +94,7 @@
           if(typeof bodyText === 'string' && bodyText.trim().startsWith('{')){
             const data = JSON.parse(bodyText);
             if(!Array.isArray(data.complaintDetails)){
-              const det = selected();
+              const det = selectedDetails();
               if(det.length) data.complaintDetails = det;
             }
             const next = { ...(init||{}), body: JSON.stringify(data) };
@@ -109,8 +107,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    const s = select();
-    if(s){ if(s.value) render(s.value); s.addEventListener('change', ()=> render(s.value)); }
-    patchSubmit();
+    const s = sel();
+    if(!s) return;
+    if(s.value) render(s.value);
+    s.addEventListener('change', ()=> render(s.value));
+    patchFetch();
   });
-})();
+})(); 
