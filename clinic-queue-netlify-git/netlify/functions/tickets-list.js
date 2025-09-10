@@ -1,37 +1,49 @@
 // netlify/functions/tickets-list.js
-// Returns all active tickets, including waiting, called, and notified.
-// Response: { ok:true, items:[{... , position: N}] }
-async function getStoreCompat(){
-  const { getStore } = await import('@netlify/blobs');
-  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
-  const token  = process.env.BLOBS_TOKEN   || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_TOKEN;
-  const name = process.env.BLOBS_STORE || 'queue';
-  return getStore({ name, siteID, token });
+function getShared(){
+  try { return require('./_shared/store'); } catch(e) {
+    try { return require('./_shared/storage'); } catch(e2) {
+      return {};
+    }
+  }
 }
-function json(body, statusCode=200){
-  return { statusCode, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) };
+async function getStore(shared){
+  if (typeof shared.getTicketsStore === 'function') return await shared.getTicketsStore();
+  if (typeof shared.ensureStore === 'function') return await shared.ensureStore('tickets');
+  throw new Error('No shared store helper found.');
+}
+async function listKeys(shared, store){
+  if (typeof shared.list === 'function') {
+    try { return await shared.list(store, 'tickets/'); } catch {}
+    try { const all = await shared.list(store); return (all || []).filter(k => typeof k === 'string' ? k.startsWith('tickets/') : k.key?.startsWith('tickets/')); } catch {}
+  }
+  if (typeof store.list === 'function') {
+    const out = await store.list({ prefix: 'tickets/' });
+    if (Array.isArray(out?.blobs)) return out.blobs.map(b => b.key);
+    if (Array.isArray(out)) return out.map(b => b.key || b);
+  }
+  return [];
+}
+async function readJson(shared, store, key){
+  if (typeof shared.getJson === 'function') return await shared.getJson(store, key);
+  if (typeof store.getJSON === 'function') return await store.getJSON(key);
+  const raw = await (typeof store.get === 'function' ? store.get(key) : null);
+  return raw ? JSON.parse(raw) : null;
 }
 module.exports.handler = async () => {
-  try{
-    const store = await getStoreCompat();
+  try {
+    const shared = getShared();
+    const store = await getStore(shared);
+    const keys = await listKeys(shared, store);
     const items = [];
-    let cursor;
-    do{
-      const page = await store.list({ prefix:'tickets/', limit: 1000, cursor });
-      for(const b of (page.blobs || [])){
-        const t = await store.get(b.key, { type:'json' });
-        if (!t) continue;
-        // include statuses we actively manage in the clinic
-        if (t.status === 'waiting' || t.status === 'called' || t.status === 'notified') {
-          items.push(t);
-        }
-      }
-      cursor = page.cursor;
-    } while (cursor);
-    items.sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
-    items.forEach((t,i)=> t.position = i+1);
-    return json({ ok:true, items });
-  }catch(err){
-    return json({ ok:false, error: (err && err.message) || String(err) }, 500);
+    for (const k of keys) {
+      const key = typeof k === 'string' ? k : (k.key || '');
+      if (!key || !key.endsWith('.json')) continue;
+      const t = await readJson(shared, store, key);
+      if (!t) continue;
+      items.push(t);
+    }
+    return { statusCode: 200, headers: { 'content-type':'application/json' }, body: JSON.stringify({ ok:true, items }) };
+  } catch (err) {
+    return { statusCode: 500, headers: { 'content-type':'application/json' }, body: JSON.stringify({ ok:false, error: err.message || 'Unexpected error' }) };
   }
 };
