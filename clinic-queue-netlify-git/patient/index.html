@@ -1,241 +1,125 @@
+
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Check in</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clinic Check‑In</title>
   <style>
     :root{
       --bg:#f7f8fb;
       --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --brand:#2563eb;
-      --brand-600:#1d4ed8;
-      --ring:rgba(37,99,235,.25);
+      --text:#1a1d2b;
+      --muted:#6b7280;
+      --accent:#0ea5e9;
+      --accent-600:#0284c7;
+      --ring:rgba(14,165,233,0.25);
       --border:#e5e7eb;
     }
-    html,body{background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
-    .wrap{max-width:980px;margin:24px auto;padding:0 16px}
-    .card{background:var(--card);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.03),0 8px 24px rgba(15,23,42,.04);padding:24px}
-    h1{font-size:28px;margin:0 0 18px}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
-    .col-6{grid-column:span 6}
-    .col-12{grid-column:span 12}
-    label{display:block;font-size:13px;color:var(--muted);margin:10px 0 6px}
-    input[type="text"], select, textarea{
-      width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#fff;
-      outline:none;transition:box-shadow .15s,border-color .15s;font-size:16px;
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:720px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);border:1px solid var(--border);padding:24px}
+    h1{font-weight:800;letter-spacing:-.02em;margin:0 0 8px}
+    p.lead{color:var(--muted);margin:0 0 24px}
+    label{display:block;font-weight:600;margin:16px 0 6px}
+    input,select,textarea{
+      width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#fff;
+      outline:none;transition:.2s;
     }
-    input:focus, select:focus, textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
-    textarea{min-height:120px;resize:vertical}
-    .btn{
-      display:inline-flex;align-items:center;justify-content:center;
-      padding:12px 18px;border-radius:10px;background:var(--brand);color:#fff;border:none;
-      font-weight:600;cursor:pointer;transition:.15s;
+    input:focus,select:focus,textarea:focus{box-shadow:0 0 0 6px var(--ring);border-color:var(--accent)}
+    .row{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+    @media (max-width:640px){.row{grid-template-columns:1fr}}
+    button.primary{
+      width:100%;margin-top:18px;background:linear-gradient(180deg,var(--accent),var(--accent-600));
+      color:#fff;border:0;border-radius:14px;padding:14px 18px;font-weight:700;cursor:pointer;
+      box-shadow:0 8px 16px rgba(2,132,199,.25);
     }
-    .btn:hover{background:var(--brand-600)}
-    .actions{margin-top:16px}
-    /* Sub-complaints block */
-    .subwrap{display:none;margin-top:8px;border:1px dashed var(--border);border-radius:12px;padding:16px}
-    .subtitle{font-size:13px;color:var(--muted);margin:0 0 12px}
-    .subgrid{
-      display:grid;
-      grid-template-columns:repeat(5,minmax(0,1fr));
-      gap:10px 14px;
-    }
-    .check{
-      display:flex;align-items:center;gap:10px;padding:6px 8px;border:1px solid var(--border);
-      border-radius:10px;background:#fff;min-height:38px;
-    }
-    .check input{width:18px;height:18px}
-    .error{color:#b91c1c;font-size:14px;margin-top:10px;display:none}
-    @media (max-width:820px){ .col-6{grid-column:span 12} .subgrid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+    small.helper{color:var(--muted)}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Check in</h1>
-      <form id="checkin">
-        <div class="grid">
-          <div class="col-6">
-            <label for="kt">Kennitala</label>
-            <input id="kt" name="kt" type="text" inputmode="numeric" placeholder="10 digits" autocomplete="off" required/>
+      <h1>Check‑in</h1>
+      <p class="lead">Please fill in your details so we can add you to today’s queue.</p>
+
+      <form id="checkinForm">
+        <div class="row">
+          <div>
+            <label for="name">Full name *</label>
+            <input id="name" required placeholder="Jane Doe" />
           </div>
-          <div class="col-6">
-            <label for="name">Full name</label>
-            <input id="name" name="name" type="text" autocomplete="name" required/>
+          <div>
+            <label for="kt">National ID (KT) *</label>
+            <input id="kt" required placeholder="YYYYMMDD-XXXX" />
           </div>
-          <div class="col-6">
-            <label for="phone">Phone</label>
-            <input id="phone" name="phone" type="text" inputmode="tel" autocomplete="tel" required/>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="phone">Phone *</label>
+            <input id="phone" required placeholder="+354 555 0000" />
           </div>
-          <div class="col-6">
-            <label for="complaint">Primary complaint</label>
-            <select id="complaint" name="complaint" required>
-              <option value="" selected disabled>Please select</option>
+          <div>
+            <label for="primary">Primary complaint *</label>
+            <select id="primary" required>
+              <option value="" disabled selected>Select one</option>
               <option>Respiratory</option>
-              <option>Gastrointestinal</option>
               <option>Dermatological</option>
-              <option>Neurological</option>
+              <option>Gastrointestinal</option>
+              <option>Ear / Nose / Throat</option>
+              <option>Eye</option>
               <option>Musculoskeletal</option>
-              <option>Cardiovascular</option>
-              <option>Urological</option>
-              <option>Gynecological</option>
-              <option>Ophthalmological</option>
-              <option>ENT</option>
-              <option>Endocrine</option>
-              <option>Psychiatric</option>
-              <option>General</option>
+              <option>Genitourinary</option>
+              <option>Neurological</option>
+              <option>Cardiovascular (non‑emergency)</option>
+              <option>Medication renewal</option>
+              <option>General advice</option>
+              <option>Other</option>
             </select>
           </div>
-
-          <div class="col-12 subwrap" id="subwrap">
-            <p class="subtitle">Details (optional)</p>
-            <div class="subgrid" id="subgrid"></div>
-          </div>
-
-          <div class="col-12">
-            <label for="notes">Anything else we should know?</label>
-            <textarea id="notes" name="notes" placeholder="Optional notes..."></textarea>
-          </div>
         </div>
-        <div class="actions">
-          <button class="btn" type="submit">Get my ticket</button>
-          <div id="err" class="error"></div>
-        </div>
+
+        <label for="notes">Notes (optional)</label>
+        <textarea id="notes" rows="4" placeholder="Add any details you’d like us to know"></textarea>
+
+        <small class="helper">By checking in, you consent to us contacting you at the provided phone number.</small>
+        <button class="primary" type="submit">Get my ticket</button>
       </form>
     </div>
   </div>
 
   <script>
-    // 15 common sub-complaints per category (curated, concise wording)
-    const SUB = {
-      "Respiratory":[
-        "Cough","Shortness of breath","Fever","Sore throat","Runny nose",
-        "Nasal congestion","Wheezing","Chest pain","Fatigue","Headache",
-        "Loss of smell","Ear pain","Sinus pressure","Hoarseness","Chills"
-      ],
-      "Gastrointestinal":[
-        "Nausea","Vomiting","Diarrhea","Constipation","Abdominal pain",
-        "Bloating","Gas","Heartburn","Black stool","Blood in stool",
-        "Upper abdominal pain","Lower abdominal pain","Loss of appetite",
-        "Reflux after meals","Weight loss"
-      ],
-      "Dermatological":[
-        "Rash","Itching","Redness","Dry skin","Hives",
-        "Eczema flare","Psoriasis flare","Blister","Acne","Infected wound",
-        "Mole change","Hair loss","Nail change","Bruising","Swelling"
-      ],
-      "Neurological":[
-        "Headache","Dizziness","Numbness","Tingling","Weakness",
-        "Confusion","Memory issues","Seizure history","Tremor","Neck stiffness",
-        "Vision change","Speech problems","Loss of balance","Migraine","Sleep disturbance"
-      ],
-      "Musculoskeletal":[
-        "Back pain","Neck pain","Joint pain","Muscle pain","Swelling",
-        "Stiffness","Limited movement","Knee pain","Shoulder pain","Hip pain",
-        "Ankle pain","Elbow pain","Wrist pain","Spasm","Recent injury"
-      ],
-      "Cardiovascular":[
-        "Chest pain","Palpitations","Shortness of breath","Leg swelling","Dizziness",
-        "Fainting","High blood pressure","Low blood pressure","Fatigue","Irregular pulse",
-        "Cold extremities","Claudication","Heart murmur noted","Family history","Recent infection"
-      ],
-      "Urological":[
-        "Painful urination","Frequent urination","Urgency","Blood in urine","Lower back pain",
-        "Urine retention","Fever/chills","Pelvic discomfort","Cloudy urine","Strong odor",
-        "Incontinence","Nocturia","Testicular pain","Flank pain","Catheter issues"
-      ],
-      "Gynecological":[
-        "Pelvic pain","Abnormal bleeding","Late period","Pregnancy concern","Vaginal discharge",
-        "Itching/irritation","Painful intercourse","Breast pain/lump","Postpartum issue","IUD issues",
-        "Hot flashes","Urinary symptoms","Lower abdominal pain","Back pain","Nausea"
-      ],
-      "Ophthalmological":[
-        "Red eye","Eye pain","Blurred vision","Itching","Discharge",
-        "Light sensitivity","Foreign body sensation","Floaters","Flashes","Lid swelling",
-        "Stye","Dryness","Double vision","Trauma","Headache"
-      ],
-      "ENT":[
-        "Ear pain","Hearing loss","Tinnitus","Dizziness","Nasal congestion",
-        "Runny nose","Sore throat","Hoarseness","Sinus pressure","Post-nasal drip",
-        "Facial pain","Tooth pain","Mouth sores","Swollen glands","Fever"
-      ],
-      "Endocrine":[
-        "Fatigue","Weight gain","Weight loss","Heat intolerance","Cold intolerance",
-        "Hair loss","Thirsty often","Frequent urination","Shaky episodes","Mood changes",
-        "Neck swelling","Constipation","Diarrhea","Menstrual changes","Skin dryness"
-      ],
-      "Psychiatric":[
-        "Anxiety","Low mood","Irritability","Poor sleep","Panic attacks",
-        "Loss of interest","Poor concentration","Stress","Appetite change","Suicidal thoughts (now?)",
-        "Hallucinations","Paranoia","Substance use concern","Grief","Work/school issues"
-      ],
-      "General":[
-        "Fever","Fatigue","Weight change","Night sweats","Chills",
-        "Dehydration","Recent travel","Medication issue","Allergic reaction","Insect bite",
-        "Fall","Wound","Swollen lymph nodes","Skin change","Other/unsure"
-      ]
-    };
-
-    const $ = (s)=>document.querySelector(s);
-    const complaintSel = $("#complaint");
-    const subWrap = $("#subwrap");
-    const subGrid = $("#subgrid");
-    const errBox = $("#err");
-
-    function renderSub(complaint){
-      const items = SUB[complaint] || [];
-      subGrid.innerHTML = "";
-      if(!items.length){ subWrap.style.display="none"; return; }
-      // Build stable id prefixes by complaint key
-      const key = complaint.replace(/[^a-z0-9]+/gi,'').toLowerCase();
-      items.forEach((label,i)=>{
-        const id = `sub_${key}_${i}`;
-        const row = document.createElement('label');
-        row.className = "check";
-        row.innerHTML = \`<input type="checkbox" value="\${label}" id="\${id}"><span>\${label}</span>\`;
-        subGrid.appendChild(row);
-      });
-      subWrap.style.display = "block";
-    }
-
-    complaintSel.addEventListener('change', (e)=>{
-      renderSub(e.target.value);
-    });
-
-    $("#checkin").addEventListener('submit', async (e)=>{
+    const form = document.getElementById('checkinForm');
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      errBox.style.display="none"; errBox.textContent="";
-      const complaint = complaintSel.value || "";
-      if(!complaint){ errBox.textContent="Please choose a primary complaint"; errBox.style.display="block"; return; }
-      const subSelected = Array.from(subGrid.querySelectorAll('input[type="checkbox"]:checked')).map(i=>i.value);
       const payload = {
-        kt: $("#kt").value.trim(),
-        name: $("#name").value.trim(),
-        phone: $("#phone").value.trim(),
-        complaint,
-        subComplaints: subSelected,
-        notes: $("#notes").value.trim()
+        name: document.getElementById('name').value.trim(),
+        kt: document.getElementById('kt').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        complaint: document.getElementById('primary').value,
+        notes: document.getElementById('notes').value.trim(),
+        acute: false // kept for backend compatibility, but we don't expose it
       };
-      try{
-        const res = await fetch('/api/tickets-create',{
-          method:'POST',
-          headers:{'content-type':'application/json'},
+      try {
+        const res = await fetch('/api/tickets-create', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify(payload)
         });
         const data = await res.json().catch(()=>({}));
-        if(!res.ok || !data || data.ok===false){
-          throw new Error((data && (data.error||data.message)) || ('HTTP '+res.status));
+        const id = data?.id || data?.ticket?.id || data?.ticketId;
+        if (!res.ok || !id) {
+          alert('Sorry, we could not create your ticket. Please try again.');
+          return;
         }
-        const id = data.id || (data.ticket && data.ticket.id);
-        if(!id) throw new Error("No ticket id returned");
-        location.href = '/patient/ticket.html?id='+encodeURIComponent(id);
-      }catch(err){
-        errBox.textContent = 'Could not create ticket: '+ err.message;
-        errBox.style.display="block";
+        // Redirect to ticket page
+        const url = new URL('/patient/ticket.html', location.origin);
+        url.searchParams.set('id', id);
+        location.href = url.toString();
+      } catch (err) {
+        alert('Network error. Please try again.');
       }
     });
   </script>
