@@ -64,6 +64,36 @@
     word-break: break-word;
     line-height: 1.25;
   }
+
+  /* Better wrapping + hyphenation for sub-complaint chips */
+#detailsGrid label span,
+.subcomplaints-grid label span {
+  /* allow natural wrapping */
+  white-space: normal !important;
+
+  /* prefer real hyphenation; fall back to breaking anywhere */
+  hyphens: auto;
+  -webkit-hyphens: auto;   /* iOS/Safari */
+  -ms-hyphens: auto;       /* old Edge */
+
+  overflow-wrap: anywhere; /* last-resort wrap (even through long strings) */
+  word-break: normal;      /* don’t smash words unless needed */
+
+  /* gentle responsive size: never too big or too small */
+  font-size: clamp(14px, 1.6vw, 18px);
+
+  line-height: 1.25;
+}
+
+/* Optional: allow breaks after slashes (e.g., "Numbness/tingling") */
+#detailsGrid label span::after,
+.subcomplaints-grid label span::after { content: ""; } /* keeps selector valid */
+#detailsGrid label span,
+.subcomplaints-grid label span {
+  /* give the browser permission to break at punctuation like / */
+  word-break: break-word;
+}
+
 </style>
 
 </head>
@@ -194,5 +224,7 @@
       } catch { alert('Network error. Please try again.'); }
     });
   </script>
+
+  
 </body>
 </html>
