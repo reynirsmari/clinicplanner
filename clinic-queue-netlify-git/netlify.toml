@@ -1,5 +1,25 @@
+# netlify.toml (put this at the repo root)
+
+[build]
+  # Where your static files live (adjust if needed)
+  publish   = "."
+  # Your serverless functions folder
+  functions = "netlify/functions"
+
+[functions]
+  # Use esbuild and DO NOT bundle @netlify/blobs (use Netlify’s runtime copy)
+  node_bundler = "esbuild"
+  external_node_modules = ["@netlify/blobs"]
+  # make sure shared helpers ship with every function
+  included_files = ["netlify/functions/_shared/**"]
+
+  # (optional, but nice) slightly larger budgets
+  # timeout = 10
+  # memory  = 1536
+
+# Nice, clean API paths -> functions
 [[redirects]]
-from = "/api/*"
-to   = "/.netlify/functions/:splat"
-status = 200
-force = true
+  from = "/api/*"
+  to   = "/.netlify/functions/:splat"
+  status = 200
+  force = true
