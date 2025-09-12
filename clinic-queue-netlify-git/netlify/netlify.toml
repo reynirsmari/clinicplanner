@@ -1,12 +1,8 @@
-# clinic-queue-netlify-git/netlify.toml
-
-[build]
-  publish = "."
-  functions = "netlify/functions"
-
-# Map /api/* to your serverless functions  
 [[redirects]]
 from = "/api/*"
-to   = "/.netlify/functions/:splat"
+to = "/.netlify/functions/:splat"
 status = 200
-force = true
+
+# Expose the named Blobs store to functions
+[[blobs]]
+id = "queue"   # <— must match STORE_NAME used above
