@@ -1,46 +1,38 @@
-/**
- * Shared store helper for Netlify Blobs.
- *
- * Prefers the built‑in runtime binding (no tokens needed).
- * Falls back to manual client when BLOBS_SITE_ID + BLOBS_TOKEN are provided.
- */
+// Robust Blobs store helper for Netlify Functions (CJS)
+//
+// Prefers the bound runtime `getStore({ name })` (no tokens needed),
+// with a safe fallback to the ESM `createClient()` for local/dev.
+//
 let boundGetStore = null;
 try {
-  // Netlify Blobs v6+ exposes getStore directly for bound credentials
+  // On Netlify runtime this is available and requires no credentials
   ({ getStore: boundGetStore } = require('@netlify/blobs'));
 } catch (_) {
-  boundGetStore = null;
+  // ignore — we'll fallback below
 }
 
-function getEnv(name) {
-  return (
-    process.env[name] ||
-    process.env[`NETLIFY_${name}`] || // compatibility
-    null
-  );
-}
+const STORE_NAME = process.env.BLOBS_STORE || 'queue';
 
+/**
+ * Returns a Netlify Blobs store instance.
+ * In production we use the bound runtime. If that's unavailable (e.g. local),
+ * we fall back to the ESM `createClient()` with site/token from env.
+ */
 async function getTicketsStore() {
-  const name = process.env.BLOBS_STORE || 'queue';
-
-  // 1) Prefer the bound runtime: no tokens in code, works in production
+  // 1) Prefer bound runtime (production on Netlify)
   if (typeof boundGetStore === 'function') {
     try {
-      const store = boundGetStore({ name });
-      // Touch a cheap op to surface misconfiguration early
-      // (list() is lazy, so we do not await to avoid extra latency)
-      return store;
+      return boundGetStore({ name: STORE_NAME });
     } catch (e) {
-      // fall through to manual if bound is unavailable
+      // continue to fallback
     }
   }
 
-  // 2) Manual client fallback (useful for local dev or older runtimes)
+  // 2) Fallback for local/dev or older runtimes — uses manual credentials
   const siteID =
     process.env.BLOBS_SITE_ID ||
-    getEnv('SITE_ID') ||
-    getEnv('SITEID') ||
-    process.env.NETLIFY_SITE_ID;
+    process.env.NETLIFY_SITE_ID ||
+    process.env.SITE_ID;
   const token =
     process.env.BLOBS_TOKEN ||
     process.env.NETLIFY_API_TOKEN ||
@@ -48,13 +40,18 @@ async function getTicketsStore() {
 
   if (!siteID || !token) {
     throw new Error(
-      'Blobs credentials missing: use Netlify bound runtime OR set BLOBS_SITE_ID + BLOBS_TOKEN.'
+      'Blobs credentials missing for manual client. ' +
+      'Either enable the bound runtime (preferred) or set BLOBS_SITE_ID and BLOBS_TOKEN.'
     );
   }
 
-  const { createClient } = require('@netlify/blobs');
-  const client = createClient({ siteID, token });
-  return client.getStore({ name });
+  // IMPORTANT: @netlify/blobs is ESM. Use dynamic import from CJS.
+  const blobs = await import('@netlify/blobs');
+  if (typeof blobs.createClient !== 'function') {
+    throw new Error('createClient not available from @netlify/blobs');
+  }
+  const client = blobs.createClient({ siteID, token });
+  return client.getStore({ name: STORE_NAME });
 }
 
 module.exports = { getTicketsStore };
