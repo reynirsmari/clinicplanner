@@ -1,29 +1,39 @@
-// Shared helper for Netlify Blobs
-async function getTicketsStore() {
-  const { getStore } = await import('@netlify/blobs');
-  const name = process.env.BLOBS_STORE || 'queue';
-  const opts = {};
-  if (process.env.BLOBS_SITE_ID && process.env.BLOBS_TOKEN) {
-    opts.siteID = process.env.BLOBS_SITE_ID;
-    opts.token  = process.env.BLOBS_TOKEN;
-  }
-  return getStore({ name, ...opts });
+// netlify/functions/_shared/store.js
+// Use Netlify's built-in binding (no token/siteID required in production)
+
+const { getStore } = require('@netlify/blobs');
+
+// Match the store name you’ve been using
+const STORE_NAME = process.env.BLOBS_STORE || 'queue';
+
+function ticketsStore() {
+  // v6+ of @netlify/blobs supports this
+  return getStore({ name: STORE_NAME });
 }
 
-function buildTicket(payload) {
-  const id = (Math.random().toString(36).slice(2,7) + Math.random().toString(36).slice(2,5)).slice(0,8);
-  const now = new Date().toISOString();
-  return {
-    id, createdAt: now, status: 'waiting',
-    priority: payload?.priority || 'C',
-    name: payload?.name || '',
-    kt: payload?.kt || '',
-    phone: payload?.phone || '',
-    complaint: payload?.complaint || '',
-    acute: Boolean(payload?.acute),
-    notes: payload?.notes || '',
-    redFlags: Array.isArray(payload?.redFlags) ? payload.redFlags : []
-  };
+async function putJson(key, value) {
+  const store = ticketsStore();
+  await store.set(key, JSON.stringify(value), {
+    contentType: 'application/json',
+    // make sure overwrites are allowed
+    overwrite: true,
+  });
 }
 
-module.exports = { getTicketsStore, buildTicket };
+async function getJson(key) {
+  const store = ticketsStore();
+  // returns parsed JSON when { type: 'json' }
+  return store.get(key, { type: 'json' });
+}
+
+async function list(prefix) {
+  const store = ticketsStore();
+  return store.list({ prefix }); // { objects: [{ key, size, uploadedAt }...] }
+}
+
+module.exports = {
+  getTicketsStore: ticketsStore,
+  putJson,
+  getJson,
+  list,
+};
