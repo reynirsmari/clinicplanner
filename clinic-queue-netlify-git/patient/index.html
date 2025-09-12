@@ -1,70 +1,64 @@
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clinic Check‑In</title>
+  <title>Check-in</title>
   <style>
-    :root{
-      --bg:#f7f8fb;
-      --card:#ffffff;
-      --text:#1a1d2b;
-      --muted:#6b7280;
-      --accent:#0ea5e9;
-      --accent-600:#0284c7;
-      --ring:rgba(14,165,233,0.25);
-      --border:#e5e7eb;
-    }
+    :root{--bg:#f7f8fb;--card:#fff;--text:#0f172a;--muted:#6b7280;--border:#e5e7eb;--ring:rgba(14,165,233,.25);--accent:#0ea5e9;--accent-600:#0284c7;}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     .wrap{max-width:720px;margin:24px auto;padding:0 16px}
-    .card{background:var(--card);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06);border:1px solid var(--border);padding:24px}
-    h1{font-weight:800;letter-spacing:-.02em;margin:0 0 8px}
-    p.lead{color:var(--muted);margin:0 0 24px}
-    label{display:block;font-weight:600;margin:16px 0 6px}
-    input,select,textarea{
-      width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#fff;
-      outline:none;transition:.2s;
-    }
+    .card{background:var(--card);border-radius:16px;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.06);padding:24px}
+    h1{margin:0 0 8px;font-weight:800;letter-spacing:-.02em}
+    p.lead{margin:0 0 20px;color:var(--muted)}
+    label{display:block;font-weight:600;margin:14px 0 6px}
+    input,select,textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#fff;outline:none;transition:.2s}
     input:focus,select:focus,textarea:focus{box-shadow:0 0 0 6px var(--ring);border-color:var(--accent)}
     .row{display:grid;gap:12px;grid-template-columns:1fr 1fr}
     @media (max-width:640px){.row{grid-template-columns:1fr}}
-    button.primary{
-      width:100%;margin-top:18px;background:linear-gradient(180deg,var(--accent),var(--accent-600));
-      color:#fff;border:0;border-radius:14px;padding:14px 18px;font-weight:700;cursor:pointer;
-      box-shadow:0 8px 16px rgba(2,132,199,.25);
-    }
+    button.primary{width:100%;margin-top:16px;background:linear-gradient(180deg,var(--accent),var(--accent-600));color:#fff;border:0;border-radius:14px;padding:14px 18px;font-weight:700;cursor:pointer;box-shadow:0 8px 16px rgba(2,132,199,.25)}
     small.helper{color:var(--muted)}
+    /* sub-complaints */
+    .details{margin-top:8px;display:none}
+    .details.visible{display:block}
+    .details .title{font-weight:600;margin:12px 0 6px}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    @media (max-width:800px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media (max-width:560px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .option{display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff}
+    .option input{width:18px;height:18px;margin:0}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+    .chip{background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;padding:6px 10px;border-radius:999px;font-size:12px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Check‑in</h1>
+      <h1>Check-in</h1>
       <p class="lead">Please fill in your details so we can add you to today’s queue.</p>
 
       <form id="checkinForm">
         <div class="row">
           <div>
             <label for="name">Full name *</label>
-            <input id="name" required placeholder="Jane Doe" />
+            <input id="name" required />
           </div>
           <div>
             <label for="kt">National ID (KT) *</label>
-            <input id="kt" required placeholder="YYYYMMDD-XXXX" />
+            <input id="kt" required />
           </div>
         </div>
 
         <div class="row">
           <div>
             <label for="phone">Phone *</label>
-            <input id="phone" required placeholder="+354 555 0000" />
+            <input id="phone" required />
           </div>
           <div>
             <label for="primary">Primary complaint *</label>
             <select id="primary" required>
-              <option value="" disabled selected>Select one</option>
+              <option value="" selected>Please select</option>
               <option>Respiratory</option>
               <option>Dermatological</option>
               <option>Gastrointestinal</option>
@@ -73,7 +67,7 @@
               <option>Musculoskeletal</option>
               <option>Genitourinary</option>
               <option>Neurological</option>
-              <option>Cardiovascular (non‑emergency)</option>
+              <option>Cardiovascular (non-emergency)</option>
               <option>Medication renewal</option>
               <option>General advice</option>
               <option>Other</option>
@@ -81,8 +75,14 @@
           </div>
         </div>
 
+        <div id="details" class="details">
+          <div class="title">Details (optional)</div>
+          <div id="options" class="grid"></div>
+          <div id="selected" class="chips" hidden></div>
+        </div>
+
         <label for="notes">Notes (optional)</label>
-        <textarea id="notes" rows="4" placeholder="Add any details you’d like us to know"></textarea>
+        <textarea id="notes" rows="4"></textarea>
 
         <small class="helper">By checking in, you consent to us contacting you at the provided phone number.</small>
         <button class="primary" type="submit">Get my ticket</button>
@@ -91,36 +91,72 @@
   </div>
 
   <script>
-    const form = document.getElementById('checkinForm');
-    form.addEventListener('submit', async (e) => {
+    const OPTIONS = {
+      "Respiratory": ["Cough","Sore throat","Runny nose","Nasal congestion","Shortness of breath","Wheezing","Chest tightness","Fever","Chills","Body aches","Sinus pressure","Post-nasal drip","Sneezing","Ear pain","Hoarseness"],
+      "Dermatological": ["Rash","Itching","Redness","Hives","Acne","Eczema flare","Psoriasis flare","Fungal infection","Wound","Cellulitis concern","Mole change","Dry skin","Sunburn","Hair loss","Nail changes"],
+      "Gastrointestinal": ["Nausea","Vomiting","Diarrhea","Constipation","Heartburn","Bloating","Gas","Blood in stool","Black stool","Upper abdominal pain","Lower abdominal pain","Loss of appetite","Reflux after meals","Weight loss","Abdominal cramps"],
+      "Ear / Nose / Throat": ["Ear pain","Hearing loss","Tinnitus","Dizziness","Sinus pain","Sore throat","Hoarseness","Nosebleed","Blocked ear","Post-nasal drip","Allergy symptoms","Swollen glands","Bad breath","Mouth sores","Dental pain"],
+      "Eye": ["Redness","Itchy eyes","Discharge","Eye pain","Vision changes","Light sensitivity","Foreign body sensation","Dryness","Tearing","Swelling","Stye","Double vision","Flashes/floaters","Contact lens irritation","Eyelid problem"],
+      "Musculoskeletal": ["Back pain","Neck pain","Shoulder pain","Knee pain","Hip pain","Ankle pain","Hand/wrist pain","Muscle strain","Joint swelling","Stiffness","Sports injury","Sciatica","Sprain","Tendonitis","Gout flare"],
+      "Genitourinary": ["Burning urination","Frequency","Urgency","Blood in urine","Flank pain","Pelvic pain","Vaginal discharge","Vaginal bleeding","Testicular pain","Erectile concerns","Prostate symptoms","Nocturia","Incontinence","STI concern","Pregnancy test"],
+      "Neurological": ["Headache","Migraine","Dizziness","Vertigo","Numbness/tingling","Weakness","Tremor","Memory issues","Confusion","Sleep problems","Seizure history","Lightheadedness","Facial pain","Neck stiffness","Concentration issues"],
+      "Cardiovascular (non-emergency)": ["Palpitations","Mild chest discomfort","High blood pressure","Leg swelling","Breathless on exertion","Dizziness when standing","Known arrhythmia follow-up","Medication review","Family history check","Cholesterol check","Heart murmur review","Pre-op clearance","Exercise intolerance","Fatigue","Syncope history"],
+      "Medication renewal": ["Blood pressure meds","Diabetes meds","Asthma inhaler","Thyroid meds","Antidepressant","Anxiety medication","Contraceptive pill","HRT","Pain medication","Allergy tablets","Acid reflux meds","Cholesterol meds","Anticoagulant follow-up","Dermatology cream","Other renewal"],
+      "General advice": ["Travel advice","Vaccinations","Lab results","Diet","Exercise","Sleep","Smoking cessation","Alcohol advice","Sexual health","Mental health support","Parenting advice","Skin care","Work note","School note","Insurance form"],
+      "Other": ["Unspecified","Needs evaluation","Second opinion","Paperwork","Follow-up","New symptom","Chronic issue","Recent injury","Post-op check","Medication question","Side effects","Allergy concern","Device issue","Wound care","Other"]
+    };
+
+    const detailsEl = document.getElementById('details');
+    const optsEl = document.getElementById('options');
+    const chipsEl = document.getElementById('selected');
+    const primary = document.getElementById('primary');
+
+    function renderDetails(){
+      const cat = primary.value;
+      optsEl.innerHTML = '';
+      chipsEl.innerHTML = '';
+      chipsEl.hidden = true;
+      if(!cat || !OPTIONS[cat]) { detailsEl.classList.remove('visible'); return; }
+      detailsEl.classList.add('visible');
+      const frag = document.createDocumentFragment();
+      OPTIONS[cat].forEach((label)=>{
+        const wrap = document.createElement('label');
+        wrap.className = 'option';
+        wrap.innerHTML = '<input type="checkbox" name="detail" value="'+label.replace(/"/g,'&quot;')+'"><span>'+label+'</span>';
+        frag.appendChild(wrap);
+      });
+      optsEl.appendChild(frag);
+    }
+
+    function updateChips(){
+      const values = [...document.querySelectorAll('input[name="detail"]:checked')].map(i=>i.value);
+      chipsEl.innerHTML = values.map(v=>'<span class="chip">'+v+'</span>').join('');
+      chipsEl.hidden = values.length === 0;
+    }
+
+    primary.addEventListener('change', renderDetails);
+    document.addEventListener('change', (e)=>{ if(e.target && e.target.name==='detail') updateChips(); });
+
+    document.getElementById('checkinForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
         name: document.getElementById('name').value.trim(),
         kt: document.getElementById('kt').value.trim(),
         phone: document.getElementById('phone').value.trim(),
         complaint: document.getElementById('primary').value,
-        notes: document.getElementById('notes').value.trim(),
-        acute: false // kept for backend compatibility, but we don't expose it
+        details: [...document.querySelectorAll('input[name="detail"]:checked')].map(i=>i.value),
+        subcomplaints: [...document.querySelectorAll('input[name="detail"]:checked')].map(i=>i.value),
+        notes: document.getElementById('notes').value.trim()
       };
       try {
-        const res = await fetch('/api/tickets-create', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
-        });
+        const res = await fetch('/api/tickets-create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         const data = await res.json().catch(()=>({}));
         const id = data?.id || data?.ticket?.id || data?.ticketId;
-        if (!res.ok || !id) {
-          alert('Sorry, we could not create your ticket. Please try again.');
-          return;
-        }
-        // Redirect to ticket page
+        if (!res.ok || !id) { alert('We could not create your ticket. Please try again.'); return; }
         const url = new URL('/patient/ticket.html', location.origin);
         url.searchParams.set('id', id);
         location.href = url.toString();
-      } catch (err) {
-        alert('Network error. Please try again.');
-      }
+      } catch { alert('Network error. Please try again.'); }
     });
   </script>
 </body>
