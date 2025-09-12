@@ -1,34 +1,11 @@
-// Robust Blobs store helper for Netlify Functions (CJS)
-//
-// Prefers the bound runtime `getStore({ name })` (no tokens needed),
-// with a safe fallback to the ESM `createClient()` for local/dev.
-//
-let boundGetStore = null;
-try {
-  // On Netlify runtime this is available and requires no credentials
-  ({ getStore: boundGetStore } = require('@netlify/blobs'));
-} catch (_) {
-  // ignore — we'll fallback below
-}
 
-const STORE_NAME = process.env.BLOBS_STORE || 'queue';
+// netlify/functions/_shared/store.js
+// Robust helper for Netlify Blobs across runtime-bound and token-based clients
+// Works with older (@netlify/blobs BlobsClient) and newer (createClient/getStore) APIs.
 
-/**
- * Returns a Netlify Blobs store instance.
- * In production we use the bound runtime. If that's unavailable (e.g. local),
- * we fall back to the ESM `createClient()` with site/token from env.
- */
-async function getTicketsStore() {
-  // 1) Prefer bound runtime (production on Netlify)
-  if (typeof boundGetStore === 'function') {
-    try {
-      return boundGetStore({ name: STORE_NAME });
-    } catch (e) {
-      // continue to fallback
-    }
-  }
+let cachedStore = null;
 
-  // 2) Fallback for local/dev or older runtimes — uses manual credentials
+function selectCred(name) {
   const siteID =
     process.env.BLOBS_SITE_ID ||
     process.env.NETLIFY_SITE_ID ||
@@ -37,21 +14,63 @@ async function getTicketsStore() {
     process.env.BLOBS_TOKEN ||
     process.env.NETLIFY_API_TOKEN ||
     process.env.NETLIFY_TOKEN;
-
   if (!siteID || !token) {
     throw new Error(
-      'Blobs credentials missing for manual client. ' +
-      'Either enable the bound runtime (preferred) or set BLOBS_SITE_ID and BLOBS_TOKEN.'
+      `Missing Netlify Blobs credentials for manual client (need siteID+token).`,
     );
   }
+  return { siteID, token, name };
+}
 
-  // IMPORTANT: @netlify/blobs is ESM. Use dynamic import from CJS.
-  const blobs = await import('@netlify/blobs');
-  if (typeof blobs.createClient !== 'function') {
-    throw new Error('createClient not available from @netlify/blobs');
+function toStore(client, name) {
+  if (!client) throw new Error('Could not create Netlify Blobs client');
+  // Newer SDK
+  if (typeof client.getStore === 'function') return client.getStore({ name });
+  // Older SDK
+  if (typeof client.store === 'function') return client.store(name);
+  throw new Error('Unsupported Netlify Blobs client shape');
+}
+
+async function getTicketsStore() {
+  if (cachedStore) return cachedStore;
+
+  const name = process.env.BLOBS_STORE || 'queue';
+
+  // 1) Prefer bound runtime store (no token required)
+  try {
+    const cjs = require('@netlify/blobs');
+    if (typeof cjs.getStore === 'function') {
+      cachedStore = cjs.getStore({ name });
+      return cachedStore;
+    }
+  } catch (_) {
+    // ignore; will try dynamic ESM import next
   }
-  const client = blobs.createClient({ siteID, token });
-  return client.getStore({ name: STORE_NAME });
+
+  // 2) Manual client via token (supports multiple SDK versions)
+  const { siteID, token } = selectCred(name);
+
+  // Use dynamic import to load ESM in CommonJS
+  const mod = await import('@netlify/blobs');
+
+  // Try several shapes to maximize compatibility
+  const maybeDefault = mod && mod.default ? mod.default : null;
+  let client = null;
+
+  if (mod && typeof mod.createClient === 'function') {
+    client = mod.createClient({ siteID, token });
+  } else if (maybeDefault && typeof maybeDefault.createClient === 'function') {
+    client = maybeDefault.createClient({ siteID, token });
+  } else if (mod && typeof mod.BlobsClient === 'function') {
+    client = new mod.BlobsClient({ siteID, token });
+  } else if (maybeDefault && typeof maybeDefault.BlobsClient === 'function') {
+    client = new maybeDefault.BlobsClient({ siteID, token });
+  } else {
+    throw new Error('No compatible client factory (createClient/BlobsClient) exported by @netlify/blobs');
+  }
+
+  cachedStore = toStore(client, name);
+  return cachedStore;
 }
 
 module.exports = { getTicketsStore };
