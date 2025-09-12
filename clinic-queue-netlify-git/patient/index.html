@@ -161,3 +161,36 @@
   </script>
 </body>
 </html>
+
+/* Sub-complaint chips: keep text inside the box and allow multi-line wrapping */
+#detailsGrid,
+.subcomplaints-grid {
+  align-items: stretch;
+}
+
+#detailsGrid label,
+.subcomplaints-grid label {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  min-height: 64px;            /* consistent height for 1–2 lines */
+  background: #fff;
+}
+
+#detailsGrid label input[type="checkbox"],
+.subcomplaints-grid label input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin-top: 2px;              /* aligns checkbox to first line of text */
+}
+
+/* Text wrapping rules – compatible with Safari/Chrome/Firefox */
+#detailsGrid label span,
+.subcomplaints-grid label span {
+  flex: 1 1 auto;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
+}
