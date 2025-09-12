@@ -1,33 +1,41 @@
 // netlify/functions/_shared/store.js
-// CommonJS helper for Netlify Blobs that does NOT require manual tokens.
-const { getStore } = require('@netlify/blobs');
+const { getStore, createClient } = require('@netlify/blobs');
 
-const STORE_NAME = process.env.BLOBS_STORE || 'queue';
+const STORE_NAME =
+  process.env.BLOBS_STORE || 'queue';
+
+function pickAuth() {
+  // Prefer BLOBS_* if present, fall back to NETLIFY_* names
+  const siteID =
+    process.env.BLOBS_SITE_ID ||
+    process.env.NETLIFY_SITE_ID ||
+    process.env.SITE_ID;
+
+  const token =
+    process.env.BLOBS_TOKEN ||
+    process.env.NETLIFY_API_TOKEN ||
+    process.env.NETLIFY_TOKEN;
+
+  return (siteID && token) ? { siteID, token } : null;
+}
 
 async function getTicketsStore() {
-  // In Netlify Functions this automatically binds to your site's Blobs storage.
+  const auth = pickAuth();
+
+  // If we have explicit credentials, use them and (optionally) ensure the store exists
+  if (auth) {
+    try {
+      const client = createClient(auth);
+      // idempotent; ignore if it already exists
+      await client.createStore({ name: STORE_NAME }).catch(() => {});
+    } catch (_) {
+      // ignore create errors; store may already exist or token may lack manage permission
+    }
+    return getStore({ name: STORE_NAME, ...auth });
+  }
+
+  // Fallback: rely on Netlify runtime auto config
   return getStore({ name: STORE_NAME });
 }
 
-async function putJson(key, value) {
-  const store = await getTicketsStore();
-  await store.set(key, JSON.stringify(value), {
-    metadata: { 'content-type': 'application/json' },
-  });
-}
-
-async function getJson(key) {
-  const store = await getTicketsStore();
-  return await store.get(key, { type: 'json' });
-}
-
-async function list(prefix) {
-  const store = await getTicketsStore();
-  const out = [];
-  for await (const entry of store.list({ prefix })) {
-    out.push(entry);
-  }
-  return out;
-}
-
-module.exports = { getTicketsStore, putJson, getJson, list };
+module.exports = { getTicketsStore };
