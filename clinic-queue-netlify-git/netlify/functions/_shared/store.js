@@ -1,39 +1,29 @@
 // netlify/functions/_shared/store.js
-// Use Netlify's built-in binding (no token/siteID required in production)
-
+// Use Netlify's built-in Blobs binding (no token required in production)
 const { getStore } = require('@netlify/blobs');
 
-// Match the store name you’ve been using
 const STORE_NAME = process.env.BLOBS_STORE || 'queue';
 
-function ticketsStore() {
-  // v6+ of @netlify/blobs supports this
+function getTicketsStore() {
   return getStore({ name: STORE_NAME });
 }
 
 async function putJson(key, value) {
-  const store = ticketsStore();
+  const store = getTicketsStore();
   await store.set(key, JSON.stringify(value), {
     contentType: 'application/json',
-    // make sure overwrites are allowed
     overwrite: true,
   });
 }
 
 async function getJson(key) {
-  const store = ticketsStore();
-  // returns parsed JSON when { type: 'json' }
+  const store = getTicketsStore();
   return store.get(key, { type: 'json' });
 }
 
 async function list(prefix) {
-  const store = ticketsStore();
-  return store.list({ prefix }); // { objects: [{ key, size, uploadedAt }...] }
+  const store = getTicketsStore();
+  return store.list({ prefix });
 }
 
-module.exports = {
-  getTicketsStore: ticketsStore,
-  putJson,
-  getJson,
-  list,
-};
+module.exports = { getTicketsStore, putJson, getJson, list };
